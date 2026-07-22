@@ -4,17 +4,20 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    private final JavaMailSender mailSender;
+    private final HttpClient client = HttpClient.newHttpClient();
 
     @Value("${email.enabled:false}")
     private boolean enabled;
@@ -22,14 +25,13 @@ public class EmailService {
     @Value("${email.from:}")
     private String from;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    @Value("${email.brevo.api-key:}")
+    private String apiKey;
 
     @PostConstruct
     void checkConfig() {
-        if (enabled && from.isBlank()) {
-            log.warn("EMAIL_ENABLED=true ama EMAIL_FROM ayarlanmamış. E-posta gönderimleri başarısız olacak.");
+        if (enabled && (from.isBlank() || apiKey.isBlank())) {
+            log.warn("EMAIL_ENABLED=true ama EMAIL_FROM veya EMAIL_API_KEY ayarlanmamış. E-posta gönderimleri başarısız olacak.");
         }
     }
 
@@ -41,16 +43,34 @@ public class EmailService {
             return;
         }
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(from);
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(body);
-            mailSender.send(message);
-            log.info("E-posta gönderildi: {}", to);
+            // Brevo'nun HTTPS API'si kullanılıyor (SMTP değil) — bazı PaaS
+            // sağlayıcıları (Railway dahil) giden SMTP portlarını (25/465/587)
+            // spam önleme amacıyla engelliyor; API HTTPS/443 üzerinden çalıştığı
+            // için bu kısıtlamadan etkilenmez.
+            String jsonBody = String.format(
+                "{\"sender\":{\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\"}",
+                jsonEscape(from), jsonEscape(to), jsonEscape(subject), jsonEscape(body));
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("api-key", apiKey)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
+                log.info("E-posta gönderildi: {}", to);
+            } else {
+                log.error("E-posta gönderilemedi. Brevo durum kodu: {}", resp.statusCode());
+            }
         } catch (Exception e) {
             log.error("E-posta gönderilemedi: {}", e.getMessage());
         }
+    }
+
+    private String jsonEscape(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     public void sendRegistration(String email, String name, String token) {
