@@ -14,6 +14,7 @@ public class Responses {
         public String token;
         public String name;
         public String phone;
+        public String email;
         public int shares;
         public String note;
         public LocalDateTime createdAt;

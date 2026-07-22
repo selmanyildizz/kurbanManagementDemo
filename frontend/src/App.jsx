@@ -106,7 +106,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('queue'); // queue | register | checkin | customer | log
 
   // Kayıt formu
-  const [regForm, setRegForm] = useState({ name: '', phone: '', shares: 7, note: '' });
+  const [regForm, setRegForm] = useState({ name: '', phone: '', email: '', shares: 7, note: '' });
   const [regLoading, setRegLoading] = useState(false);
   const [lastToken, setLastToken] = useState(null);
   const [tokenRevealed, setTokenRevealed] = useState(false);
@@ -194,8 +194,8 @@ export default function App() {
       const r = await api.registerKurban(regForm);
       setLastToken(r.token);
       setTokenRevealed(false);
-      setRegForm({ name: '', phone: '', shares: 7, note: '' });
-      showToast(`${r.name} kaydedildi. Token SMS ile gönderildi.`);
+      setRegForm({ name: '', phone: '', email: '', shares: 7, note: '' });
+      showToast(`${r.name} kaydedildi. Token gönderildi.`);
       loadDash();
     } catch (e) { showToast(e.message, 'error'); }
     finally { setRegLoading(false); }
@@ -372,6 +372,7 @@ export default function App() {
                 {[
                   { key: 'name', label: 'Ad Soyad *', placeholder: 'Ahmet Yılmaz', type: 'text' },
                   { key: 'phone', label: 'Telefon *', placeholder: '0532 111 22 33', type: 'tel' },
+                  { key: 'email', label: 'E-posta (opsiyonel)', placeholder: 'ornek@mail.com', type: 'email' },
                   { key: 'note', label: 'Not (opsiyonel)', placeholder: 'Mahalle, özel istek...', type: 'text' },
                 ].map(f => (
                   <div key={f.key} className="field">
@@ -388,13 +389,13 @@ export default function App() {
                   </select>
                 </div>
                 <button type="submit" disabled={regLoading} className="btn btn-block">
-                  {regLoading ? 'Kaydediliyor...' : 'Kaydet & SMS Gönder'}
+                  {regLoading ? 'Kaydediliyor...' : 'Kaydet'}
                 </button>
               </form>
 
               {lastToken && (
                 <div className="token-box">
-                  <div className="hint">✓ Token müşterinin telefonuna SMS ile gönderildi</div>
+                  <div className="hint">✓ Token kaydedildi</div>
                   {tokenRevealed && <div className="code">{lastToken}</div>}
                   <div className="hint2">Check-in sırasında bu kod girilecek</div>
                   <button type="button" className="btn btn-ghost token-reveal"

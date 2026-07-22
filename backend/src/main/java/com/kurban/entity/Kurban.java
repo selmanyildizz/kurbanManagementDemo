@@ -21,6 +21,8 @@ public class Kurban {
     @Column(nullable = false)
     private String phone;
 
+    private String email;
+
     @Column(nullable = false)
     private Integer shares;
 
@@ -43,6 +45,8 @@ public class Kurban {
     public void setName(String name) { this.name = name; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
     public Integer getShares() { return shares; }
     public void setShares(Integer shares) { this.shares = shares; }
     public String getNote() { return note; }

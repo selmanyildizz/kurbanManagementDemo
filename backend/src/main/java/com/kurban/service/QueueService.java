@@ -27,18 +27,20 @@ public class QueueService {
     private final ButcherStationRepository stationRepo;
     private final AuditLogRepository auditRepo;
     private final SmsService sms;
+    private final EmailService email;
 
     @Value("${queue.noshow-timeout-minutes:15}")
     private int noshowTimeout;
 
     public QueueService(KurbanRepository kurbanRepo, QueueEntryRepository queueRepo,
                         ButcherStationRepository stationRepo, AuditLogRepository auditRepo,
-                        SmsService sms) {
+                        SmsService sms, EmailService email) {
         this.kurbanRepo = kurbanRepo;
         this.queueRepo = queueRepo;
         this.stationRepo = stationRepo;
         this.auditRepo = auditRepo;
         this.sms = sms;
+        this.email = email;
     }
 
     private String generateToken() {
@@ -58,6 +60,7 @@ public class QueueService {
         k.setToken(generateToken());
         k.setName(req.name.trim());
         k.setPhone(req.phone.trim());
+        k.setEmail(req.email != null ? req.email.trim() : null);
         k.setShares(req.shares);
         k.setNote(req.note);
         kurbanRepo.save(k);
@@ -65,6 +68,7 @@ public class QueueService {
         sms.send(k.getPhone(), String.format(
             "Sayın %s, kurban kaydınız alındı. Gün içinde geldiğinizde sıra kodunuzu (%s) büroda gösterin.",
             k.getName(), k.getToken()));
+        email.sendRegistration(k.getEmail(), k.getName(), k.getToken());
         audit("REGISTERED", k, null, actor, "Kayıt oluşturuldu");
         return toKurbanResponse(k);
     }
@@ -92,6 +96,7 @@ public class QueueService {
 
         int position = getWaitingPosition(entry.getId());
         sms.sendCheckinConfirm(k.getPhone(), k.getName(), position);
+        email.sendCheckinConfirm(k.getEmail(), k.getName(), position);
         audit("CHECKIN", k, null, actor, "Check-in. Sıra: " + position);
         return toQueueResponse(entry, position);
     }
@@ -119,6 +124,7 @@ public class QueueService {
         queueRepo.save(next);
 
         sms.sendCalled(next.getKurban().getPhone(), next.getKurban().getName(), station.getName());
+        email.sendCalled(next.getKurban().getEmail(), next.getKurban().getName(), station.getName());
         audit("CALLED", next.getKurban(), station, actor, "Çağrıldı → " + station.getName());
         return toQueueResponse(next, null);
     }
@@ -142,6 +148,7 @@ public class QueueService {
         entry.setCompletedTime(LocalDateTime.now());
         queueRepo.save(entry);
         sms.sendDone(entry.getKurban().getPhone(), entry.getKurban().getName());
+        email.sendDone(entry.getKurban().getEmail(), entry.getKurban().getName());
         audit("DONE", entry.getKurban(), entry.getStation(), actor, "Tamamlandı");
         return toQueueResponse(entry, null);
     }
@@ -155,8 +162,10 @@ public class QueueService {
                 : ButcherStation.StationStatus.ACTIVE);
         stationRepo.save(station);
         if (goingOnBreak) {
-            queueRepo.findWaitingOrderByCheckinTime().stream().limit(5).forEach(q ->
-                sms.sendBreakNotice(q.getKurban().getPhone(), q.getKurban().getName()));
+            queueRepo.findWaitingOrderByCheckinTime().stream().limit(5).forEach(q -> {
+                sms.sendBreakNotice(q.getKurban().getPhone(), q.getKurban().getName());
+                email.sendBreakNotice(q.getKurban().getEmail(), q.getKurban().getName());
+            });
             audit("BREAK_START", null, station, actor, "Mola başladı");
         } else {
             audit("BREAK_END", null, station, actor, "Mola bitti");
@@ -173,6 +182,7 @@ public class QueueService {
                     q.setStatus(QueueStatus.NOSHOW);
                     queueRepo.save(q);
                     sms.sendNoshow(q.getKurban().getPhone(), q.getKurban().getName());
+                    email.sendNoshow(q.getKurban().getEmail(), q.getKurban().getName());
                     audit("NOSHOW", q.getKurban(), q.getStation(), "SİSTEM", noshowTimeout + " dk içinde gelmedi");
                     log.info("No-show: {} ({})", q.getKurban().getName(), q.getKurban().getToken());
                 });
@@ -266,7 +276,7 @@ public class QueueService {
     private Responses.KurbanResponse toKurbanResponse(Kurban k) {
         Responses.KurbanResponse r = new Responses.KurbanResponse();
         r.id = k.getId(); r.token = k.getToken(); r.name = k.getName();
-        r.phone = k.getPhone(); r.shares = k.getShares(); r.note = k.getNote();
+        r.phone = k.getPhone(); r.email = k.getEmail(); r.shares = k.getShares(); r.note = k.getNote();
         r.createdAt = k.getCreatedAt();
         return r;
     }

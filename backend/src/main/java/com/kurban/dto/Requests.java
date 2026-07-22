@@ -9,6 +9,8 @@ public class Requests {
         public String name;
         @NotBlank(message = "Telefon zorunlu")
         public String phone;
+        @Email(message = "Geçerli bir e-posta girin")
+        public String email;
         @Min(1) @Max(7)
         public int shares = 7;
         public String note;
