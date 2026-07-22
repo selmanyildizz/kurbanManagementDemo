@@ -141,15 +141,15 @@ input, select { font-family: inherit; }
   overflow-x: auto; max-width: 100%;
   -webkit-overflow-scrolling: touch;
 }
-.tabs button {
+.tabs button, .tabs a {
   flex: 0 0 auto;
   background: none; border: none; color: var(--dim);
   font-size: 13px; font-weight: 600; padding: 8px 14px;
   border-radius: 8px; cursor: pointer; white-space: nowrap;
-  transition: color .15s;
+  transition: color .15s; text-decoration: none; display: inline-block;
 }
-.tabs button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
-.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tabs button.on, .tabs a.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tabs button:focus-visible, .tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .header-right { display: flex; align-items: center; gap: 18px; margin-left: auto; flex-wrap: wrap; }
 .stats { display: flex; gap: 18px; }
