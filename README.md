@@ -24,11 +24,11 @@ Multi-user kurban kesim işletme yönetim sistemi. JWT auth, real-time kuyruk, a
 - Check-in sırasında sıra no bildiriliyor
 
 ✅ **Deployment**
-- Docker multi-stage (backend: Maven→JRE, frontend: Node→Caddy)
-- Docker Compose: PostgreSQL 16, backend, Caddy reverse proxy
+- Backend: Railway (Docker, `backend/Dockerfile`, Maven→JRE) + Railway Managed PostgreSQL
+- Frontend: Netlify (Vite build, statik hosting)
+- Docker Compose ile local geliştirme (PostgreSQL 16, backend, Caddy reverse proxy)
 - Flyway migrations (schema, staff user)
-- Env-based config (.env)
-- Caddy auto HTTPS + SPA routing
+- Env-based config (.env / platform environment variables)
 
 ✅ **Frontend**
 - React 18 + Vite
@@ -86,47 +86,50 @@ Kullanıcı Adı: admin
 
 ---
 
-## 🌐 VPS Deployment
+## ☁️ Canlı Deployment (Railway + Netlify)
 
-### Gereksinimler
+Sistem şu an **Railway** (backend + PostgreSQL) ve **Netlify** (frontend) üzerinde canlı olarak çalışıyor.
 
-- Ubuntu 22.04+
-- Docker + Docker Compose
-- 2+ GB RAM, 20+ GB disk
+### Backend — Railway
 
-### Adımlar
+1. Railway'de yeni proje → **GitHub repo bağla** (bu repo)
+2. Servis **Settings → Source → Root Directory** → `backend` olarak ayarla (Railway `backend/Dockerfile`'ı build eder, kök dizindeki `docker-compose.yml`'i görmez)
+3. **+ New → Database → Add PostgreSQL** ile ayrı bir managed Postgres servisi ekle
+4. Backend servisinin **Variables** sekmesine ekle (Postgres servisinin adı neyse `${{ServisAdi.PGHOST}}` şeklinde referans ver):
+   ```
+   DB_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+   DB_USERNAME=${{Postgres.PGUSER}}
+   DB_PASSWORD=${{Postgres.PGPASSWORD}}
+   JWT_SECRET=<güçlü rastgele base64 secret>
+   ADMIN_BOOTSTRAP_USERNAME=admin
+   ADMIN_BOOTSTRAP_PASSWORD=<güçlü şifre — ilk kurulumdan sonra değiştirilmeli>
+   SMS_ENABLED=false
+   CORS_ALLOWED_ORIGINS=https://<netlify-domain>
+   ```
+5. **Settings → Networking → Generate Domain** ile backend'in public URL'ini al (ör. `https://xxx.up.railway.app`)
+
+### Frontend — Netlify
+
+1. Netlify → **Add new site → Import from GitHub** → bu repo
+2. Build ayarları:
+   - Base directory: `frontend`
+   - Build command: `npm run build`
+   - Publish directory: `frontend/dist`
+3. **Environment variables:**
+   ```
+   VITE_API_BASE=https://<railway-backend-domain>/api
+   ```
+4. Deploy sonrası aldığın Netlify URL'ini Railway backend'in `CORS_ALLOWED_ORIGINS` değişkenine ekle, backend'i redeploy et.
+
+### Yeni Admin Kullanıcısı Ekleme (canlıda)
+
+`ADMIN_BOOTSTRAP_*` yalnızca veritabanı boşken **ilk açılışta bir kere** çalışır — sonradan env var değiştirmek mevcut kullanıcıyı güncellemez. Yeni kullanıcı eklemek için mevcut bir admin ile login olup token al, sonra:
 
 ```bash
-ssh user@vps_ip
-git clone https://github.com/your-org/kurban-sistemi-v4.git
-cd kurban-sistemi-v4
-
-cp .env.example .env
-# DOMAIN, DB_PASSWORD, JWT_SECRET, SMS bilgilerini düzelt
-nano .env
-
-docker compose up -d
-```
-
-Caddy otomatik HTTPS sağlar (Let's Encrypt).
-
----
-
-## ☁️ Frontend - Vercel
-
-```bash
-cd frontend
-vercel deploy
-```
-
-Vercel dashboard → Environment Variables:
-```
-VITE_API_BASE=https://api.your-domain.com
-```
-
-VPS .env:
-```bash
-CORS_ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
+curl -X POST https://<railway-backend-domain>/api/admin/users \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yeni_kullanici","password":"guclu_sifre","displayName":"Ad Soyad"}'
 ```
 
 ---
@@ -151,7 +154,7 @@ docker compose logs backend -f
 
 ---
 
-## 🔑 Admin Yönetimi
+## 🔑 Admin Yönetimi (local Docker)
 
 **Yeni admin ekle:**
 ```bash
@@ -165,12 +168,7 @@ curl -X POST http://localhost/api/admin/users \
   }'
 ```
 
-**Şifre değiştir (SQL):**
-```bash
-docker compose exec db psql -U postgres kurbandb
-UPDATE staff_user SET password_hash = crypt('new_password', gen_salt('bf'))
-WHERE username = 'admin';
-```
+> Not: Şifre değiştirme veya "kullanıcı sil" endpoint'i henüz yok. Şifre yenilemek için yukarıdaki gibi yeni bir kullanıcı oluşturup eski hesabı kullanmayı bırakmak en güvenli yol — `staff_user` tablosuna doğrudan SQL ile şifre yazmak BCrypt hash'i bozar, yapılmamalı.
 
 ---
 
