@@ -9,14 +9,15 @@ const STATUS_LABEL = {
   DONE: 'Hazır',
   NOSHOW: 'Gelmedi',
 };
-const STATUS_COLOR = {
-  WAITING: '#f59e0b',
-  CALLED: '#3b82f6',
-  CUTTING: '#ef4444',
-  DONE: '#10b981',
-  NOSHOW: '#6b7280',
+const STATUS_PILL = {
+  WAITING: 'pill-waiting',
+  CALLED: 'pill-called',
+  CUTTING: 'pill-cutting',
+  DONE: 'pill-done',
+  NOSHOW: 'pill-noshow',
 };
 const STATION_STATUS_LABEL = { ACTIVE: 'Aktif', BREAK: 'Molada', OFFLINE: 'Kapalı' };
+const STATION_PILL = { ACTIVE: 'pill-active', BREAK: 'pill-break', OFFLINE: 'pill-offline' };
 
 // ── Yardımcılar ───────────────────────────────────────────────
 function timeAgo(dateStr) {
@@ -27,23 +28,78 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 3600)}sa`;
 }
 
+function initials(name) {
+  return (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('');
+}
+
+// Kalabalık büro ortamında ekrana bakan biri kodu çalamasın diye
+// token her listede maskeli gösterilir; tam kod yalnızca SMS'te.
+function maskToken(t) {
+  if (!t || t.length < 4) return t;
+  return t.slice(0, 2) + '•••' + t.slice(-1);
+}
+
 function Toast({ msg, type, onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-      background: type === 'error' ? '#ef4444' : '#10b981',
-      color: '#fff', padding: '12px 20px', borderRadius: 10,
-      fontWeight: 600, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,.3)',
-      display: 'flex', alignItems: 'center', gap: 10,
-    }}>
+    <div className={`toast ${type === 'error' ? 'error' : 'ok'}`}>
       {type === 'error' ? '✕' : '✓'} {msg}
+    </div>
+  );
+}
+
+function LoginForm({ onLogin }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await api.login(username.trim(), password);
+      onLogin();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-brand">
+          <span className="emoji" aria-hidden="true">🐑</span>
+          <h1>Kurban Sıra Sistemi</h1>
+          <div className="sub">Büro Girişi</div>
+        </div>
+        <form onSubmit={handleSubmit} className="form">
+          <div className="field">
+            <label htmlFor="login-user">Kullanıcı Adı</label>
+            <input id="login-user" className="input" value={username}
+              onChange={e => setUsername(e.target.value)} autoFocus autoComplete="username" />
+          </div>
+          <div className="field">
+            <label htmlFor="login-pass">Şifre</label>
+            <input id="login-pass" className="input" type="password" value={password}
+              onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
+          </div>
+          {error && <div className="login-error">{error}</div>}
+          <button type="submit" disabled={loading} className="btn btn-block">
+            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
 
 // ── Ana Uygulama ──────────────────────────────────────────────
 export default function App() {
+  const [session, setSession] = useState(() => api.getSession());
   const [dash, setDash] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -53,6 +109,7 @@ export default function App() {
   const [regForm, setRegForm] = useState({ name: '', phone: '', shares: 7, note: '' });
   const [regLoading, setRegLoading] = useState(false);
   const [lastToken, setLastToken] = useState(null);
+  const [tokenRevealed, setTokenRevealed] = useState(false);
 
   // Check-in
   const [checkinToken, setCheckinToken] = useState('');
@@ -69,6 +126,7 @@ export default function App() {
       const d = await api.getDashboard();
       setDash(d);
     } catch (e) {
+      if (e.unauthorized) setSession(null);
       // backend henüz ayakta değilse sessizce geç
     } finally {
       setLoading(false);
@@ -76,10 +134,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!session) return;
     loadDash();
     const interval = setInterval(loadDash, 5000);
     return () => clearInterval(interval);
-  }, [loadDash]);
+  }, [loadDash, session]);
+
+  function handleLogout() {
+    api.logout();
+    setSession(null);
+    setDash(null);
+  }
+
+  if (!session) {
+    return <LoginForm onLogin={() => setSession(api.getSession())} />;
+  }
 
   // ── Aksiyon handler'ları ────────────────────────────────────
 
@@ -124,8 +193,9 @@ export default function App() {
     try {
       const r = await api.registerKurban(regForm);
       setLastToken(r.token);
+      setTokenRevealed(false);
       setRegForm({ name: '', phone: '', shares: 7, note: '' });
-      showToast(`${r.name} kaydedildi. Token: ${r.token}`);
+      showToast(`${r.name} kaydedildi. Token SMS ile gönderildi.`);
       loadDash();
     } catch (e) { showToast(e.message, 'error'); }
     finally { setRegLoading(false); }
@@ -150,117 +220,92 @@ export default function App() {
     } catch (e) { showToast(e.message, 'error'); }
   }
 
-  // ── Render yardımcıları ────────────────────────────────────
-
   const s = dash;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#f1f5f9', fontFamily: 'system-ui, sans-serif' }}>
+    <div>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Header */}
-      <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 24 }}>🐑</span>
+      <header className="app-header">
+        <div className="brand">
+          <span className="emoji" aria-hidden="true">🐑</span>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16 }}>Kurban Sıra Sistemi</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>Büro Paneli</div>
+            <div className="brand-name">Kurban Sıra Sistemi</div>
+            <div className="brand-sub">Büro Paneli</div>
           </div>
         </div>
 
-        {/* Sekmeler */}
-        <div style={{ display: 'flex', gap: 6 }}>
+        <nav className="tabs" aria-label="Bölümler">
           {[
-            { id: 'queue', label: '📋 Kuyruk' },
-            { id: 'register', label: '➕ Kayıt' },
-            { id: 'checkin', label: '✅ Check-in' },
-            { id: 'customer', label: '🔍 Müşteri' },
-            { id: 'log', label: '📜 Log' },
+            { id: 'queue', label: 'Kuyruk' },
+            { id: 'register', label: 'Kayıt' },
+            { id: 'checkin', label: 'Check-in' },
+            { id: 'customer', label: 'Müşteri' },
+            { id: 'log', label: 'Log' },
           ].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              padding: '7px 13px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              background: activeTab === t.id ? '#2563eb' : '#0f172a',
-              color: activeTab === t.id ? '#fff' : '#94a3b8',
-            }}>{t.label}</button>
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={activeTab === t.id ? 'on' : ''}>{t.label}</button>
           ))}
-        </div>
+        </nav>
 
-        {/* İstatistik özeti */}
-        {s && (
-          <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
-            {[
-              { label: 'Bekliyor', val: s.waitingCount, color: '#f59e0b' },
-              { label: 'Kesiliyor', val: s.cuttingCount, color: '#ef4444' },
-              { label: 'Hazır', val: s.doneCount, color: '#10b981' },
-            ].map(x => (
-              <div key={x.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontWeight: 800, fontSize: 18, color: x.color }}>{x.val}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>{x.label}</div>
-              </div>
-            ))}
+        <div className="header-right">
+          {s && (
+            <div className="stats">
+              <div className="stat stat-waiting"><b className="tabular">{s.waitingCount}</b><span>Bekliyor</span></div>
+              <div className="stat stat-cutting"><b className="tabular">{s.cuttingCount}</b><span>Kesiliyor</span></div>
+              <div className="stat stat-done"><b className="tabular">{s.doneCount}</b><span>Hazır</span></div>
+            </div>
+          )}
+          <div className="user-chip">
+            <div className="avatar">{initials(session.displayName)}</div>
+            <span>{session.displayName}</span>
+            <button onClick={handleLogout} className="btn btn-ghost" style={{ padding: '7px 13px', fontSize: 12.5 }}>Çıkış</button>
           </div>
-        )}
-      </div>
+        </div>
+      </header>
 
-      <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto' }}>
+      <main className="app-body">
 
         {/* ── KUYRUK SEKMESİ ──────────────────────────────── */}
         {activeTab === 'queue' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-
-            {/* Sol: Aktif kuyruk */}
+          <div className="queue-layout">
             <div>
               {/* Masalar */}
               {s && (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(s.stations?.length || 2, 4)}, 1fr)`, gap: 12, marginBottom: 20 }}>
+                <div className="stations">
                   {s.stations?.map(st => (
-                    <div key={st.id} style={{
-                      background: '#1e293b', borderRadius: 14, padding: 16,
-                      border: `2px solid ${st.status === 'ACTIVE' ? '#10b981' : st.status === 'BREAK' ? '#f59e0b' : '#475569'}`,
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                        <div style={{ fontWeight: 700 }}>{st.name}</div>
-                        <span style={{
-                          fontSize: 11, padding: '2px 8px', borderRadius: 6, fontWeight: 600,
-                          background: st.status === 'ACTIVE' ? '#064e3b' : st.status === 'BREAK' ? '#451a03' : '#1e293b',
-                          color: st.status === 'ACTIVE' ? '#34d399' : st.status === 'BREAK' ? '#fbbf24' : '#6b7280',
-                        }}>
-                          {STATION_STATUS_LABEL[st.status]}
-                        </span>
+                    <div key={st.id} className="station">
+                      <div className="station-head">
+                        <b>{st.name}</b>
+                        <span className={`pill ${STATION_PILL[st.status]}`}>{STATION_STATUS_LABEL[st.status]}</span>
                       </div>
 
-                      {/* Masadaki aktif kurban */}
                       {st.currentKurban ? (
-                        <div style={{ background: '#0f172a', borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{st.currentKurban.name}</div>
-                          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                        <div className="occupant">
+                          <div className="nm">{st.currentKurban.name}</div>
+                          <div className="meta tabular">
                             {st.currentKurban.shares} hisse · {STATUS_LABEL[st.currentKurban.status]}
-                          </div>
-                          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                            {st.currentKurban.status === 'CALLED' && (
-                              <button onClick={() => handleStartCutting(st.currentKurban.id, st.currentKurban.name)}
-                                style={btnStyle('#dc2626')}>🔪 Kes</button>
-                            )}
-                            {st.currentKurban.status === 'CUTTING' && (
-                              <button onClick={() => handleComplete(st.currentKurban.id, st.currentKurban.name)}
-                                style={btnStyle('#059669')}>✓ Bitti</button>
-                            )}
                           </div>
                         </div>
                       ) : (
-                        <div style={{ color: '#475569', fontSize: 13, marginBottom: 10 }}>Boş</div>
+                        <div className="station-empty">Boş</div>
                       )}
 
-                      {/* Aksiyon butonları */}
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div className="station-actions">
+                        {st.currentKurban?.status === 'CALLED' && (
+                          <button onClick={() => handleStartCutting(st.currentKurban.id, st.currentKurban.name)}
+                            className="btn btn-danger">🔪 Kes</button>
+                        )}
+                        {st.currentKurban?.status === 'CUTTING' && (
+                          <button onClick={() => handleComplete(st.currentKurban.id, st.currentKurban.name)}
+                            className="btn btn-done">✓ Bitti</button>
+                        )}
                         {!st.currentKurban && st.status === 'ACTIVE' && (
-                          <button onClick={() => handleCallNext(st.id)}
-                            style={btnStyle('#1d4ed8', { flex: 1 })}>
-                            ▶ Sıradakini Çağır
-                          </button>
+                          <button onClick={() => handleCallNext(st.id)} className="btn">▶ Sıradakini Çağır</button>
                         )}
                         <button onClick={() => handleBreak(st.id, st.name)}
-                          style={btnStyle(st.status === 'BREAK' ? '#059669' : '#92400e', { flex: st.currentKurban ? 1 : 0 })}>
+                          className={`btn ${st.status === 'BREAK' ? 'btn-done' : 'btn-warn'}`}>
                           {st.status === 'BREAK' ? '▶ Devam' : '⏸ Mola'}
                         </button>
                       </div>
@@ -270,107 +315,92 @@ export default function App() {
               )}
 
               {/* Kuyruk listesi */}
-              <div style={{ background: '#1e293b', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', fontWeight: 700, fontSize: 14 }}>
-                  Aktif Kuyruk {s ? `(${s.queue?.length || 0})` : ''}
+              <div className="card">
+                <div className="card-head">
+                  <span>Aktif Kuyruk</span>
+                  <span className="tabular">{s?.queue?.length || 0}</span>
                 </div>
-                {loading && <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Yükleniyor...</div>}
-                {!loading && (!s?.queue?.length) && (
-                  <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Kuyruk boş</div>
-                )}
+                {loading && <div className="empty-note">Yükleniyor...</div>}
+                {!loading && (!s?.queue?.length) && <div className="empty-note">Kuyruk boş</div>}
                 {s?.queue?.map(q => (
-                  <div key={q.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
-                    borderBottom: '1px solid #1e293b',
-                    background: q.status === 'CALLED' ? '#1c1a00' : 'transparent',
-                  }}>
-                    {/* Sıra no */}
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: q.status === 'WAITING' ? '#1c1400' : '#0f172a',
-                      color: STATUS_COLOR[q.status], fontWeight: 800, fontSize: 16, flexShrink: 0,
-                    }}>
-                      {q.queuePosition ?? '—'}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 700 }}>{q.name}</span>
-                        <span style={{
-                          fontSize: 11, padding: '1px 7px', borderRadius: 5, fontWeight: 600,
-                          background: STATUS_COLOR[q.status] + '22', color: STATUS_COLOR[q.status],
-                        }}>{STATUS_LABEL[q.status]}</span>
-                        {q.stationName && <span style={{ fontSize: 11, color: '#64748b' }}>{q.stationName}</span>}
+                  <div key={q.id} className={`qrow ${q.status === 'CALLED' ? 'called-bg' : ''}`}>
+                    <div className="qpos tabular">{q.queuePosition ?? '—'}</div>
+                    <div className="qinfo">
+                      <div className="qname-line">
+                        <span className="qname">{q.name}</span>
+                        <span className={`pill ${STATUS_PILL[q.status]}`}>{STATUS_LABEL[q.status]}</span>
+                        {q.stationName && <span className="qstation">{q.stationName}</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      <div className="qmeta tabular">
                         {q.shares} hisse · check-in: {timeAgo(q.checkinTime)} önce
-                        {q.note && <> · <span style={{ color: '#94a3b8' }}>{q.note}</span></>}
+                        {q.note && <> · {q.note}</>}
                       </div>
                     </div>
-                    <div style={{ fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>{q.token}</div>
+                    <span className="qtoken">{maskToken(q.token)}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Sağ: Log */}
-            <div>
-              <div style={{ background: '#1e293b', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', fontWeight: 700, fontSize: 14 }}>
-                  📜 Son İşlemler
-                </div>
-                {s?.recentLogs?.map((l, i) => (
-                  <div key={i} style={{ padding: '10px 16px', borderBottom: '1px solid #0f172a' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>{l.action}</span>
-                      <span style={{ fontSize: 11, color: '#475569' }}>{timeAgo(l.createdAt)}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#cbd5e1' }}>
-                      {l.kurbanName && <>{l.kurbanName} </>}
-                      {l.stationName && <span style={{ color: '#64748b' }}>→ {l.stationName}</span>}
-                    </div>
-                    {l.note && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{l.note}</div>}
+            <div className="card">
+              <div className="card-head">Son İşlemler</div>
+              {s?.recentLogs?.map((l, i) => (
+                <div key={i} className="logrow">
+                  <div className="log-head">
+                    <span className="log-act">{l.action}</span>
+                    <span className="log-time">{timeAgo(l.createdAt)}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="log-line">
+                    {l.kurbanName && <>{l.kurbanName} </>}
+                    {l.stationName && <span className="log-station">→ {l.stationName}</span>}
+                  </div>
+                  {l.actor && <div className="log-actor">👤 {l.actor}</div>}
+                  {l.note && <div className="log-note">{l.note}</div>}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {/* ── KAYIT SEKMESİ ────────────────────────────── */}
         {activeTab === 'register' && (
-          <div style={{ maxWidth: 480 }}>
-            <div style={{ background: '#1e293b', borderRadius: 14, padding: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 20 }}>Yeni Kurban Kaydı</div>
-              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="narrow">
+            <div className="card card-pad">
+              <div className="card-head" style={{ padding: '0 0 16px', border: 'none' }}>Yeni Kurban Kaydı</div>
+              <form onSubmit={handleRegister} className="form">
                 {[
                   { key: 'name', label: 'Ad Soyad *', placeholder: 'Ahmet Yılmaz', type: 'text' },
                   { key: 'phone', label: 'Telefon *', placeholder: '0532 111 22 33', type: 'tel' },
                   { key: 'note', label: 'Not (opsiyonel)', placeholder: 'Mahalle, özel istek...', type: 'text' },
                 ].map(f => (
-                  <div key={f.key}>
-                    <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5 }}>{f.label}</label>
-                    <input type={f.type} placeholder={f.placeholder}
-                      value={regForm[f.key]} onChange={e => setRegForm(p => ({ ...p, [f.key]: e.target.value }))}
-                      style={inputStyle} />
+                  <div key={f.key} className="field">
+                    <label htmlFor={`reg-${f.key}`}>{f.label}</label>
+                    <input id={`reg-${f.key}`} className="input" type={f.type} placeholder={f.placeholder}
+                      value={regForm[f.key]} onChange={e => setRegForm(p => ({ ...p, [f.key]: e.target.value }))} />
                   </div>
                 ))}
-                <div>
-                  <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 5 }}>Hisse Sayısı</label>
-                  <select value={regForm.shares} onChange={e => setRegForm(p => ({ ...p, shares: parseInt(e.target.value) }))}
-                    style={inputStyle}>
+                <div className="field">
+                  <label htmlFor="reg-shares">Hisse Sayısı</label>
+                  <select id="reg-shares" className="input" value={regForm.shares}
+                    onChange={e => setRegForm(p => ({ ...p, shares: parseInt(e.target.value) }))}>
                     {[1, 2, 3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n} hisse</option>)}
                   </select>
                 </div>
-                <button type="submit" disabled={regLoading} style={btnStyle('#1d4ed8', { width: '100%', padding: '12px', fontSize: 15, marginTop: 4 })}>
-                  {regLoading ? 'Kaydediliyor...' : '💾 Kaydet & SMS Gönder'}
+                <button type="submit" disabled={regLoading} className="btn btn-block">
+                  {regLoading ? 'Kaydediliyor...' : 'Kaydet & SMS Gönder'}
                 </button>
               </form>
 
               {lastToken && (
-                <div style={{ marginTop: 20, background: '#0f172a', borderRadius: 10, padding: 16, textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Müşteriye verilecek token</div>
-                  <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: 6, color: '#f59e0b' }}>{lastToken}</div>
-                  <div style={{ fontSize: 12, color: '#475569', marginTop: 6 }}>Check-in sırasında bu kod girilecek</div>
+                <div className="token-box">
+                  <div className="hint">✓ Token müşterinin telefonuna SMS ile gönderildi</div>
+                  {tokenRevealed && <div className="code">{lastToken}</div>}
+                  <div className="hint2">Check-in sırasında bu kod girilecek</div>
+                  <button type="button" className="btn btn-ghost token-reveal"
+                    onClick={() => setTokenRevealed(v => !v)}>
+                    {tokenRevealed ? 'Gizle' : "Token'ı Göster"}
+                  </button>
                 </div>
               )}
             </div>
@@ -379,58 +409,54 @@ export default function App() {
 
         {/* ── CHECK-IN SEKMESİ ─────────────────────────── */}
         {activeTab === 'checkin' && (
-          <div style={{ maxWidth: 440 }}>
-            <div style={{ background: '#1e293b', borderRadius: 14, padding: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Müşteri Check-in</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 20 }}>
+          <div className="narrow">
+            <div className="card card-pad">
+              <div className="card-head" style={{ padding: '0 0 6px', border: 'none' }}>Müşteri Check-in</div>
+              <p style={{ fontSize: 13, color: 'var(--dim)', margin: '0 0 18px' }}>
                 Müşteri fiziksel olarak geldiğinde tokenını gir. Sırası o an başlar.
-              </div>
-              <form onSubmit={handleCheckin} style={{ display: 'flex', gap: 10 }}>
+              </p>
+              <form onSubmit={handleCheckin} className="inline-form">
                 <input
+                  className="input token-input"
                   placeholder="Token (ör. AB3X7K)"
                   value={checkinToken}
                   onChange={e => setCheckinToken(e.target.value.toUpperCase())}
-                  style={{ ...inputStyle, flex: 1, letterSpacing: 3, fontSize: 18, fontWeight: 700, textAlign: 'center' }}
+                  aria-label="Check-in token"
                 />
-                <button type="submit" style={btnStyle('#059669', { padding: '10px 20px' })}>✓ Giriş</button>
+                <button type="submit" className="btn btn-done">✓ Giriş</button>
               </form>
-              <div style={{ fontSize: 12, color: '#475569', marginTop: 12 }}>
-                ℹ️ Erken gelen = erken sıra. Sıralama tamamen check-in zamanına göre yapılır.
-              </div>
+              <p style={{ fontSize: 12, color: 'var(--noshow)', margin: '14px 0 0' }}>
+                Erken gelen = erken sıra. Sıralama tamamen check-in zamanına göre yapılır.
+              </p>
             </div>
           </div>
         )}
 
         {/* ── MÜŞTERİ SORGULAMA SEKMESİ ───────────────── */}
         {activeTab === 'customer' && (
-          <div style={{ maxWidth: 500 }}>
-            <div style={{ background: '#1e293b', borderRadius: 14, padding: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 20 }}>Müşteri Durumu Sorgula</div>
-              <form onSubmit={handleQuery} style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                <input placeholder="Token gir..." value={queryToken}
+          <div className="narrow">
+            <div className="card card-pad">
+              <div className="card-head" style={{ padding: '0 0 16px', border: 'none' }}>Müşteri Durumu Sorgula</div>
+              <form onSubmit={handleQuery} className="inline-form" style={{ marginBottom: 20 }}>
+                <input className="input token-input" placeholder="Token gir..." value={queryToken}
                   onChange={e => setQueryToken(e.target.value.toUpperCase())}
-                  style={{ ...inputStyle, flex: 1, letterSpacing: 3 }} />
-                <button type="submit" style={btnStyle('#1d4ed8', { padding: '10px 20px' })}>Sorgula</button>
+                  aria-label="Sorgulanacak token" />
+                <button type="submit" className="btn">Sorgula</button>
               </form>
 
               {customerStatus && (
-                <div style={{ background: '#0f172a', borderRadius: 12, padding: 20 }}>
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>{customerStatus.name}</div>
-                  <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>{customerStatus.shares} hisse</div>
-                  <div style={{
-                    padding: '14px 18px', borderRadius: 10,
-                    background: customerStatus.status === 'DONE' ? '#064e3b'
-                      : customerStatus.status === 'CALLED' ? '#1e1b4b'
-                      : customerStatus.status === 'CUTTING' ? '#450a0a' : '#1c1400',
-                    color: customerStatus.status === 'DONE' ? '#34d399'
-                      : customerStatus.status === 'CALLED' ? '#818cf8'
-                      : customerStatus.status === 'CUTTING' ? '#fca5a5' : '#fbbf24',
-                    fontWeight: 600, fontSize: 15,
-                  }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 2 }}>{customerStatus.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 14 }} className="tabular">
+                    {customerStatus.shares} hisse
+                  </div>
+                  <div className={`status-banner ${customerStatus.status || 'none'}`}>
                     {customerStatus.statusMessage}
                   </div>
                   {customerStatus.stationName && (
-                    <div style={{ marginTop: 12, fontSize: 13, color: '#64748b' }}>Masa: {customerStatus.stationName}</div>
+                    <div style={{ marginTop: 12, fontSize: 13, color: 'var(--dim)' }}>
+                      Masa: {customerStatus.stationName}
+                    </div>
                   )}
                 </div>
               )}
@@ -440,38 +466,22 @@ export default function App() {
 
         {/* ── LOG SEKMESİ ──────────────────────────────── */}
         {activeTab === 'log' && (
-          <div style={{ background: '#1e293b', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid #334155', fontWeight: 700 }}>
-              Tüm İşlem Geçmişi
-            </div>
+          <div className="card">
+            <div className="card-head">Tüm İşlem Geçmişi</div>
             {s?.recentLogs?.map((l, i) => (
-              <div key={i} style={{ display: 'flex', gap: 16, padding: '12px 20px', borderBottom: '1px solid #0f172a', fontSize: 13 }}>
-                <span style={{ color: '#475569', minWidth: 60, fontFamily: 'monospace' }}>{new Date(l.createdAt).toLocaleTimeString('tr-TR')}</span>
-                <span style={{ minWidth: 100, color: '#94a3b8', fontWeight: 600 }}>{l.action}</span>
-                <span style={{ flex: 1 }}>{l.kurbanName || '—'}</span>
-                <span style={{ color: '#64748b' }}>{l.stationName || ''}</span>
-                <span style={{ color: '#475569' }}>{l.note}</span>
+              <div key={i} className="logtable-row">
+                <span className="t">{new Date(l.createdAt).toLocaleTimeString('tr-TR')}</span>
+                <span className="a">{l.action}</span>
+                <span className="n">{l.kurbanName || '—'}</span>
+                <span className="s">{l.stationName || ''}</span>
+                <span className="who">{l.actor ? `👤 ${l.actor}` : ''}</span>
+                {l.note && <span className="note">{l.note}</span>}
               </div>
             ))}
           </div>
         )}
 
-      </div>
+      </main>
     </div>
   );
-}
-
-// ── Stil yardımcıları ──────────────────────────────────────────
-const inputStyle = {
-  width: '100%', padding: '10px 14px', borderRadius: 8,
-  border: '1px solid #334155', background: '#0f172a', color: '#f1f5f9',
-  fontSize: 14, boxSizing: 'border-box', outline: 'none',
-};
-
-function btnStyle(bg, extra = {}) {
-  return {
-    padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
-    background: bg, color: '#fff', fontWeight: 600, fontSize: 13,
-    transition: 'opacity .15s', ...extra,
-  };
 }

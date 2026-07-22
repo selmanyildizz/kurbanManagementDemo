@@ -2,6 +2,7 @@ package com.kurban.dto;
 
 import com.kurban.entity.ButcherStation;
 import com.kurban.entity.QueueEntry;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -55,6 +56,7 @@ public class Responses {
         public String action;
         public String kurbanName;
         public String stationName;
+        public String actor;
         public String note;
         public LocalDateTime createdAt;
     }
@@ -66,5 +68,19 @@ public class Responses {
         public Integer queuePosition;
         public String statusMessage;
         public String stationName;
+    }
+
+    public static class LoginResponse {
+        public String token;
+        public String username;
+        public String displayName;
+        public Instant expiresAt;
+    }
+
+    public static class StaffUserResponse {
+        public UUID id;
+        public String username;
+        public String displayName;
+        public boolean active;
     }
 }

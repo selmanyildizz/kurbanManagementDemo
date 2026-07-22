@@ -53,7 +53,7 @@ public class QueueService {
         return token;
     }
 
-    public Responses.KurbanResponse registerKurban(Requests.KurbanCreate req) {
+    public Responses.KurbanResponse registerKurban(Requests.KurbanCreate req, String actor) {
         Kurban k = new Kurban();
         k.setToken(generateToken());
         k.setName(req.name.trim());
@@ -65,20 +65,24 @@ public class QueueService {
         sms.send(k.getPhone(), String.format(
             "Sayın %s, kurban kaydınız alındı. Gün içinde geldiğinizde sıra kodunuzu (%s) büroda gösterin.",
             k.getName(), k.getToken()));
-        audit("REGISTERED", k, null, "Büro", "Kayıt oluşturuldu");
+        audit("REGISTERED", k, null, actor, "Kayıt oluşturuldu");
         return toKurbanResponse(k);
     }
 
-    public Responses.QueueResponse checkin(String token) {
+    public Responses.QueueResponse checkin(String token, String actor) {
         Kurban k = kurbanRepo.findByToken(token.toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Token bulunamadı: " + token));
 
-        boolean alreadyActive = queueRepo.findTopByKurbanTokenOrderByCheckinTimeDesc(token.toUpperCase())
-                .map(q -> q.getStatus() == QueueStatus.WAITING
-                        || q.getStatus() == QueueStatus.CALLED
-                        || q.getStatus() == QueueStatus.CUTTING)
-                .orElse(false);
-        if (alreadyActive) throw new IllegalStateException("Bu kurban zaten kuyrukta");
+        queueRepo.findTopByKurbanTokenOrderByCheckinTimeDesc(token.toUpperCase())
+                .ifPresent(last -> {
+                    switch (last.getStatus()) {
+                        case WAITING, CALLED, CUTTING ->
+                            throw new IllegalStateException("Bu kurban zaten kuyrukta");
+                        case DONE ->
+                            throw new IllegalStateException("Bu kurbanın kesimi zaten tamamlandı. Tekrar check-in yapılamaz.");
+                        case NOSHOW -> { /* gelmediği için sırası düşen tekrar girebilir */ }
+                    }
+                });
 
         QueueEntry entry = new QueueEntry();
         entry.setKurban(k);
@@ -88,11 +92,11 @@ public class QueueService {
 
         int position = getWaitingPosition(entry.getId());
         sms.sendCheckinConfirm(k.getPhone(), k.getName(), position);
-        audit("CHECKIN", k, null, "Büro", "Check-in. Sıra: " + position);
+        audit("CHECKIN", k, null, actor, "Check-in. Sıra: " + position);
         return toQueueResponse(entry, position);
     }
 
-    public Responses.QueueResponse callNext(int stationId) {
+    public Responses.QueueResponse callNext(int stationId, String actor) {
         ButcherStation station = stationRepo.findById(stationId)
                 .orElseThrow(() -> new IllegalArgumentException("Masa bulunamadı"));
 
@@ -115,22 +119,22 @@ public class QueueService {
         queueRepo.save(next);
 
         sms.sendCalled(next.getKurban().getPhone(), next.getKurban().getName(), station.getName());
-        audit("CALLED", next.getKurban(), station, "Büro", "Çağrıldı → " + station.getName());
+        audit("CALLED", next.getKurban(), station, actor, "Çağrıldı → " + station.getName());
         return toQueueResponse(next, null);
     }
 
-    public Responses.QueueResponse startCutting(UUID entryId) {
+    public Responses.QueueResponse startCutting(UUID entryId, String actor) {
         QueueEntry entry = getEntry(entryId);
         if (entry.getStatus() != QueueStatus.CALLED)
             throw new IllegalStateException("Sadece CALLED durumundaki giriş kesilebilir");
         entry.setStatus(QueueStatus.CUTTING);
         entry.setCuttingStartTime(LocalDateTime.now());
         queueRepo.save(entry);
-        audit("CUTTING", entry.getKurban(), entry.getStation(), "Büro", "Kesim başladı");
+        audit("CUTTING", entry.getKurban(), entry.getStation(), actor, "Kesim başladı");
         return toQueueResponse(entry, null);
     }
 
-    public Responses.QueueResponse complete(UUID entryId) {
+    public Responses.QueueResponse complete(UUID entryId, String actor) {
         QueueEntry entry = getEntry(entryId);
         if (entry.getStatus() != QueueStatus.CUTTING)
             throw new IllegalStateException("Sadece CUTTING durumundaki giriş tamamlanabilir");
@@ -138,11 +142,11 @@ public class QueueService {
         entry.setCompletedTime(LocalDateTime.now());
         queueRepo.save(entry);
         sms.sendDone(entry.getKurban().getPhone(), entry.getKurban().getName());
-        audit("DONE", entry.getKurban(), entry.getStation(), "Büro", "Tamamlandı");
+        audit("DONE", entry.getKurban(), entry.getStation(), actor, "Tamamlandı");
         return toQueueResponse(entry, null);
     }
 
-    public Responses.StationResponse toggleBreak(int stationId) {
+    public Responses.StationResponse toggleBreak(int stationId, String actor) {
         ButcherStation station = stationRepo.findById(stationId)
                 .orElseThrow(() -> new IllegalArgumentException("Masa bulunamadı"));
         boolean goingOnBreak = station.getStatus() == ButcherStation.StationStatus.ACTIVE;
@@ -153,9 +157,9 @@ public class QueueService {
         if (goingOnBreak) {
             queueRepo.findWaitingOrderByCheckinTime().stream().limit(5).forEach(q ->
                 sms.sendBreakNotice(q.getKurban().getPhone(), q.getKurban().getName()));
-            audit("BREAK_START", null, station, "Büro", "Mola başladı");
+            audit("BREAK_START", null, station, actor, "Mola başladı");
         } else {
-            audit("BREAK_END", null, station, "Büro", "Mola bitti");
+            audit("BREAK_END", null, station, actor, "Mola bitti");
         }
         return toStationResponse(station);
     }
@@ -195,6 +199,7 @@ public class QueueService {
         resp.recentLogs   = auditRepo.findAllByOrderByCreatedAtDesc().stream().limit(20)
                 .map(l -> { var a = new Responses.AuditResponse(); a.action = l.getAction();
                     a.kurbanName = l.getKurbanName(); a.stationName = l.getStationName();
+                    a.actor = l.getActor();
                     a.note = l.getNote(); a.createdAt = l.getCreatedAt(); return a; })
                 .collect(Collectors.toList());
         return resp;

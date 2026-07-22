@@ -5,6 +5,11 @@ import com.kurban.repository.ButcherStationRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+/**
+ * Varsayılan masalar artık V1__init_schema.sql migration'ı ile seed ediliyor.
+ * Bu runner sadece migration'ın hiç uygulanmadığı (test/edge-case) ortamlar için
+ * bir güvenlik ağı olarak kalıyor.
+ */
 @Component
 public class DataInitializer implements CommandLineRunner {
 

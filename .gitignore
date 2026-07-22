@@ -1,0 +1,18 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Backend (Maven)
+backend/target/
+*.class
+
+# Frontend (Node/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*.local
+
+# Secrets
+.env
+!.env.example

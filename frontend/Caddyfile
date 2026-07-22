@@ -1,0 +1,18 @@
+# {$DOMAIN} gerçek bir alan adıysa (örn. kurban.ornek.com), Caddy otomatik olarak
+# Let's Encrypt sertifikası alır. Sadece HTTP ile lokal test için DOMAIN=:80 kullanın.
+{$DOMAIN}
+
+encode gzip
+
+# Backend'e /api/* isteklerini olduğu gibi (prefix korunarak) ilet.
+handle /api/* {
+    reverse_proxy backend:8080
+}
+
+# Geri kalan her şey statik SPA build'i — /durum/:token gibi client-side
+# route'ların çalışması için bulunamayan dosyalar index.html'e düşer.
+handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+}

@@ -23,4 +23,20 @@ public class Requests {
         @NotBlank
         public String name;
     }
+
+    public static class LoginRequest {
+        @NotBlank(message = "Kullanıcı adı zorunlu")
+        public String username;
+        @NotBlank(message = "Şifre zorunlu")
+        public String password;
+    }
+
+    public static class StaffUserCreate {
+        @NotBlank(message = "Kullanıcı adı zorunlu")
+        public String username;
+        @NotBlank(message = "Şifre zorunlu")
+        public String password;
+        @NotBlank(message = "Ad Soyad zorunlu")
+        public String displayName;
+    }
 }
