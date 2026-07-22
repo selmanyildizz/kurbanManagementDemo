@@ -1,134 +1,189 @@
-# Kurban Sıra Yönetim Sistemi
+# Kurban Sıra Sistemi
 
-## Mimari
+Multi-user kurban kesim işletme yönetim sistemi. JWT auth, real-time kuyruk, audit logging, SMS bildirimleri.
 
-```
-[Büro PC / Tablet]          [Müşteri Telefonu]
-       |                            |
-  React Frontend               React CustomerPage
-       |                            |
-       └──────── Spring Boot API ───┘
-                      |
-                  PostgreSQL
-```
+## 🚀 Başlı Başına Özellikler
 
-## Sorun → Çözüm Tablosu
+✅ **Güvenlik**
+- Spring Security + JWT (HS256, bearer token)
+- Multi-user auth (admin/müşteri yöneticileri)
+- Actor audit trail (tüm işlemler kişi bazlı loglanır)
+- DONE kaydı tekrar check-in engeli
+- Token gizleme UI'da (büyük puntoda ekranda açık değil)
 
-| Geçen yılın sorunu | Bu sistemdeki çözüm |
-|---|---|
-| Erken gelen bekliyor, geç gelen önce giriyor | Sıra = checkin zamanı. Başka kriter yok. |
-| Tanıdık öne geçirme | Sıra değiştirme endpoint'i YOK. Her işlem loglanıyor. |
-| Kasap yorulunca müşteri bilgilendirilmiyor | Mola butonu → SMS otomatik gider |
-| "Deftere isim yaz" | Sistem kayıt oluyor, token veriliyor |
-| Gelmeyenler sırayı tıkıyor | 15 dk → NOSHOW, sonraki çağrılıyor |
-| Kasap kanlı elle tablette işlem yapıyor | Büro her şeyi yönetiyor, kasap dokunmuyor |
+✅ **Operasyon**
+- Real-time kuyruk (sıra, check-in, çağrı, kesim, tamamlama)
+- 2 kesim masası (Masa 1, Masa 2)
+- Hisse sayısı (1-7)
+- Mola yönetimi per masa
+- NOSHOW otomatikleştirme (15dk timeout, SMS bildirim)
+
+✅ **Müşteri**
+- QR linki: `/durum/:token` → public status page
+- Token SMS ile gönderiliyor (Netgsm)
+- Check-in sırasında sıra no bildiriliyor
+
+✅ **Deployment**
+- Docker multi-stage (backend: Maven→JRE, frontend: Node→Caddy)
+- Docker Compose: PostgreSQL 16, backend, Caddy reverse proxy
+- Flyway migrations (schema, staff user)
+- Env-based config (.env)
+- Caddy auto HTTPS + SPA routing
+
+✅ **Frontend**
+- React 18 + Vite
+- Sakin Klinik tasarımı (yumuşak yeşil-beyaz, responsive)
+- Responsive (mobil/tablet/desktop kırılımları)
 
 ---
 
-## Kurulum
+## 🔧 Hızlı Başlangıç (Local Docker)
 
-### Backend (Spring Boot)
-
-```bash
-cd backend
-
-# H2 ile direkt çalıştır (PostgreSQL gerekmez)
-./mvnw spring-boot:run
-
-# Uygulama: http://localhost:8080
-# H2 Console: http://localhost:8080/h2-console
-```
-
-**PostgreSQL'e geçmek için** `application.properties` içinde:
-```properties
-# H2 satırlarını yorum yap, PostgreSQL satırlarını aç
-spring.datasource.url=jdbc:postgresql://localhost:5432/kurbandb
-spring.datasource.username=postgres
-spring.datasource.password=sifre
-spring.jpa.hibernate.ddl-auto=update
-spring.flyway.enabled=true
-```
+### 1. Ortam Hazırlığı
 
 ```bash
-# Docker ile PostgreSQL
-docker run -d \
-  --name kurban-db \
-  -e POSTGRES_DB=kurbandb \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=sifre \
-  -p 5432:5432 \
-  postgres:16
+cd kurban-sistemi-v4
+cp .env.example .env
 ```
 
-### Frontend (React)
+`.env` dosyasında:
+
+```bash
+DB_USER=postgres
+DB_PASSWORD=YourSecurePassword123!
+POSTGRES_DB=kurbandb
+
+JWT_SECRET=your-random-secure-base64-32chars
+
+ADMIN_BOOTSTRAP_USERNAME=admin
+ADMIN_BOOTSTRAP_PASSWORD=admin123456
+
+SMS_ENABLED=false
+CORS_ALLOWED_ORIGINS=http://localhost
+DOMAIN=localhost
+```
+
+### 2. Docker Compose ile Başlat
+
+```bash
+docker compose up -d
+```
+
+Servisler:
+- PostgreSQL 16 → :5432
+- Backend (Spring Boot) → :8080
+- Frontend (Caddy) → :80, :443
+
+### 3. Login
+
+**URL:** http://localhost/
+
+**Bilgiler:**
+```
+Kullanıcı Adı: admin
+Şifre: admin123456
+```
+
+---
+
+## 🌐 VPS Deployment
+
+### Gereksinimler
+
+- Ubuntu 22.04+
+- Docker + Docker Compose
+- 2+ GB RAM, 20+ GB disk
+
+### Adımlar
+
+```bash
+ssh user@vps_ip
+git clone https://github.com/your-org/kurban-sistemi-v4.git
+cd kurban-sistemi-v4
+
+cp .env.example .env
+# DOMAIN, DB_PASSWORD, JWT_SECRET, SMS bilgilerini düzelt
+nano .env
+
+docker compose up -d
+```
+
+Caddy otomatik HTTPS sağlar (Let's Encrypt).
+
+---
+
+## ☁️ Frontend - Vercel
 
 ```bash
 cd frontend
-npm create vite@latest . -- --template react
-# Mevcut src/ dosyalarını kopyala
-npm install
-npm run dev
-# http://localhost:5173
+vercel deploy
+```
+
+Vercel dashboard → Environment Variables:
+```
+VITE_API_BASE=https://api.your-domain.com
+```
+
+VPS .env:
+```bash
+CORS_ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
 ```
 
 ---
 
-## API Referansı
+## 📱 SMS - Netgsm
 
-| Method | Endpoint | Açıklama |
-|---|---|---|
-| GET | `/api/admin/dashboard` | Tüm dashboard verisi |
-| POST | `/api/admin/kurban` | Yeni kayıt |
-| POST | `/api/admin/checkin` | Check-in `{token}` |
-| POST | `/api/admin/queue/call-next/{stationId}` | Sıradakini çağır |
-| POST | `/api/admin/queue/{entryId}/start-cutting` | Kesim başladı |
-| POST | `/api/admin/queue/{entryId}/complete` | Tamamlandı |
-| POST | `/api/admin/station/{id}/break` | Mola aç/kapat |
-| GET | `/api/status/{token}` | Müşteri durumu (public) |
+### 1. Hesap Oluştur
+https://www.netgsm.com.tr
 
----
-
-## Günlük Akış
-
+### 2. .env Güncelle
+```bash
+SMS_ENABLED=true
+SMS_USERNAME=your_username
+SMS_PASSWORD=your_password
 ```
-1. SATIŞ GÜNÜ (önceden)
-   Büro → "Kayıt" sekmesi → isim/telefon gir → Token alınır → SMS gider
 
-2. KURBAN BAYRAMINDA
-   Müşteri gelir → "Check-in" sekmesi → Token girilir → Sıraya eklenir
-   
-   Büro kasabı izler → Masa boşaldı → "Sıradakini Çağır" → SMS gider
-   
-   Müşteri geldi → "Kes" butonu → Kesim başladı
-   
-   Kasap bitirdi → Büro "Bitti" → SMS gider → Teslim
-
-3. KASAP YORULDU
-   Büro → "Mola" butonu → Sıra dondurulur → Bekleyenlere SMS
-
-4. MÜŞTERİ MERAK EDİYOR
-   SMS'teki link → Telefonda kendi durumunu görüyor
+### 3. Test Et
+```bash
+docker compose logs backend -f
+# Kayıt yap → SMS gönderilmeli
 ```
 
 ---
 
-## SMS Entegrasyonu (Netgsm)
+## 🔑 Admin Yönetimi
 
-```properties
-# application.properties
-sms.enabled=true
-sms.netgsm.usercode=KULLANICI_KODUNUZ
-sms.netgsm.password=SIFRE
-sms.netgsm.msgheader=FIRMAADI
+**Yeni admin ekle:**
+```bash
+curl -X POST http://localhost/api/admin/users \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "ali",
+    "password": "ali123456",
+    "displayName": "Ali Yılmaz"
+  }'
 ```
 
-Netgsm başvuru: https://www.netgsm.com.tr
+**Şifre değiştir (SQL):**
+```bash
+docker compose exec db psql -U postgres kurbandb
+UPDATE staff_user SET password_hash = crypt('new_password', gen_salt('bf'))
+WHERE username = 'admin';
+```
 
 ---
 
-## Notlar
+## 🐛 Troubleshooting
 
-- **Sıra değiştirme endpoint'i kasıtlı olarak yoktur.** Manipülasyon önlemi.
-- Tüm işlemler `audit_log` tablosuna yazılır. Sorgulama için Log sekmesi.
-- No-show kontrolü 60 saniyede bir çalışır (Scheduled task).
-- Frontend 5 saniyede bir dashboard'u yeniler (polling). WebSocket eklenebilir.
+| Sorun | Çözüm |
+|-------|-------|
+| Port in use | `docker compose down && docker compose up -d` |
+| DB bağlantısı başarısız | `docker compose logs db` |
+| 401 Unauthorized | Token geçerli mi? Süresi dolmuş mu? |
+| SMS gönderilmiyor | Netgsm kredisi var mı? Telefon geçerli mi? |
+
+---
+
+**Version:** 1.0 (Production-ready)  
+**Updated:** 2026-07-22
