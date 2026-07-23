@@ -352,19 +352,18 @@ export default function LandingPage() {
               <div className="field">
                 <label htmlFor="ct-phone">Telefon</label>
                 <input id="ct-phone" className="input" type="tel" required maxLength={30}
-                  placeholder="0532 111 22 33" value={contact.phone}
+                  value={contact.phone}
                   onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} />
               </div>
               <div className="field">
                 <label htmlFor="ct-email">E-posta</label>
                 <input id="ct-email" className="input" type="email" required maxLength={180}
-                  placeholder="ornek@mail.com" value={contact.email}
+                  value={contact.email}
                   onChange={e => setContact(p => ({ ...p, email: e.target.value }))} />
               </div>
               <div className="field">
                 <label htmlFor="ct-msg">Mesajınız</label>
                 <textarea id="ct-msg" className="input" rows={4} required maxLength={2000}
-                  placeholder="Hangi hizmet hakkında bilgi almak istiyorsunuz?"
                   value={contact.message}
                   onChange={e => setContact(p => ({ ...p, message: e.target.value }))} />
               </div>

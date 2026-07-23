@@ -176,7 +176,7 @@ input, select, textarea { font-family: inherit; }
 .queue-layout {
   display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px;
 }
-.narrow { max-width: 500px; }
+.narrow { max-width: 500px; margin: 0 auto; }
 
 /* ── Masalar ── */
 .stations {
