@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import Layout from './components/Layout';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
 import QueuePage from './pages/QueuePage';
 import RegisterPage from './pages/RegisterPage';
 import CheckinPage from './pages/CheckinPage';
@@ -11,7 +13,9 @@ export default function App() {
   return (
     <AppProvider>
       <Routes>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/giris" element={<LoginPage />} />
+        <Route path="/panel" element={<Layout />}>
           <Route index element={<QueuePage />} />
           <Route path="kayit" element={<RegisterPage />} />
           <Route path="checkin" element={<CheckinPage />} />

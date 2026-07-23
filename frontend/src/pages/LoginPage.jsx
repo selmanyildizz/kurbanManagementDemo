@@ -1,13 +1,17 @@
 import { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/api';
 import { useApp } from '../context/AppContext';
 
 export default function LoginPage() {
-  const { login } = useApp();
+  const { session, login } = useApp();
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  if (session) return <Navigate to="/panel" replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -16,6 +20,7 @@ export default function LoginPage() {
     try {
       await api.login(username.trim(), password);
       login();
+      navigate('/panel');
     } catch (e) {
       setError(e.message);
     } finally {

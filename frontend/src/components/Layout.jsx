@@ -1,21 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { initials } from '../utils/format';
 import Toast from './Toast';
-import LoginPage from '../pages/LoginPage';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Kuyruk', end: true },
-  { to: '/kayit', label: 'Kayıt' },
-  { to: '/checkin', label: 'Check-in' },
-  { to: '/musteri', label: 'Müşteri' },
-  { to: '/log', label: 'Log' },
+  { to: '/panel', label: 'Kuyruk', end: true },
+  { to: '/panel/kayit', label: 'Kayıt' },
+  { to: '/panel/checkin', label: 'Check-in' },
+  { to: '/panel/musteri', label: 'Müşteri' },
+  { to: '/panel/log', label: 'Log' },
 ];
 
 export default function Layout() {
   const { session, dash, toast, closeToast, logout } = useApp();
 
-  if (!session) return <LoginPage />;
+  if (!session) return <Navigate to="/giris" replace />;
 
   const s = dash;
 
