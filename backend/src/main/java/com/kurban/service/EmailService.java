@@ -50,9 +50,20 @@ public class EmailService {
      * (ör. iletişim formu, kullanıcıya sonuç gösterilecek) kullanılır.
      */
     public boolean doSend(String to, String subject, String body) {
+        return doSend(to, subject, body, null, null);
+    }
+
+    /**
+     * @param senderName gelen kutusunda görünecek isim; {@code sender.email}
+     *                   her zaman doğrulanmış {@code email.from} olmak zorunda
+     *                   (Brevo doğrulanmamış adresten göndermeyi reddeder).
+     * @param replyTo    "Yanıtla" dendiğinde gidilecek adres.
+     */
+    public boolean doSend(String to, String subject, String body, String senderName, String replyTo) {
         if (to == null || to.isBlank()) return false;
         if (!enabled) {
-            log.info("✉️ Email [SIM] → {} : {} — {}", to, subject, body);
+            log.info("✉️ Email [SIM] → {} (yanıt: {}) : {} — {}",
+                    to, replyTo == null ? "-" : replyTo, subject, body);
             return true;
         }
         try {
@@ -60,9 +71,18 @@ public class EmailService {
             // sağlayıcıları (Railway dahil) giden SMTP portlarını (25/465/587)
             // spam önleme amacıyla engelliyor; API HTTPS/443 üzerinden çalıştığı
             // için bu kısıtlamadan etkilenmez.
+            StringBuilder sender = new StringBuilder("{\"email\":\"").append(jsonEscape(from)).append('"');
+            if (senderName != null && !senderName.isBlank()) {
+                sender.append(",\"name\":\"").append(jsonEscape(senderName)).append('"');
+            }
+            sender.append('}');
+
+            String replyToPart = (replyTo == null || replyTo.isBlank()) ? ""
+                    : String.format(",\"replyTo\":{\"email\":\"%s\"}", jsonEscape(replyTo));
+
             String jsonBody = String.format(
-                "{\"sender\":{\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\"}",
-                jsonEscape(from), jsonEscape(to), jsonEscape(subject), jsonEscape(body));
+                "{\"sender\":%s,\"to\":[{\"email\":\"%s\"}]%s,\"subject\":\"%s\",\"textContent\":\"%s\"}",
+                sender, jsonEscape(to), replyToPart, jsonEscape(subject), jsonEscape(body));
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
@@ -131,11 +151,11 @@ public class EmailService {
     }
 
     /**
-     * Landing sayfasındaki bilgi talebini işletmeye iletir. Gönderen adres
-     * doğrulanmış {@code email.from} olmak zorunda (Brevo şartı); ziyaretçinin
-     * iletişim bilgisi mesaj gövdesinde taşınır.
+     * Landing sayfasındaki bilgi talebini işletmeye iletir. Mail, gelen
+     * kutusunda ziyaretçinin adıyla görünür ve "Yanıtla" doğrudan ziyaretçiye
+     * gider; gönderen adres ise doğrulanmış {@code email.from} kalmak zorunda.
      */
-    public boolean sendContactRequest(String name, String phone, String message) {
+    public boolean sendContactRequest(String name, String phone, String email, String message) {
         String to = contactTo.isBlank() ? from : contactTo;
         if (to.isBlank()) {
             log.error("Bilgi talebi iletilemiyor: EMAIL_CONTACT_TO (veya EMAIL_FROM) ayarlanmamış.");
@@ -146,10 +166,11 @@ public class EmailService {
 
                 Ad Soyad : %s
                 Telefon  : %s
+                E-posta  : %s
 
                 Mesaj:
                 %s
-                """, name, phone, message);
-        return doSend(to, "Bilgi Talebi — " + name, body);
+                """, name, phone, email, message);
+        return doSend(to, "Bilgi Talebi — " + name, body, name, email);
     }
 }

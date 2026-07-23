@@ -51,6 +51,10 @@ public class Requests {
         @NotBlank(message = "Telefon zorunlu")
         @Size(max = 30, message = "Telefon çok uzun")
         public String phone;
+        @NotBlank(message = "E-posta zorunlu")
+        @Email(message = "Geçerli bir e-posta girin")
+        @Size(max = 180, message = "E-posta çok uzun")
+        public String email;
         @NotBlank(message = "Mesaj zorunlu")
         @Size(max = 2000, message = "Mesaj en fazla 2000 karakter olabilir")
         public String message;

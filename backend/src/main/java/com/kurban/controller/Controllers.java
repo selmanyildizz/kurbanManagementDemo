@@ -163,7 +163,7 @@ class ContactController {
         }
 
         boolean sent = emailService.sendContactRequest(
-                req.name.trim(), req.phone.trim(), req.message.trim());
+                req.name.trim(), req.phone.trim(), req.email.trim(), req.message.trim());
         if (!sent) {
             log.error("İletişim formu gönderilemedi (IP {})", ip);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)

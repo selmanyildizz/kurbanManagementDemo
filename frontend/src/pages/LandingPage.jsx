@@ -98,7 +98,7 @@ const STEPS = [
   },
 ];
 
-const EMPTY_CONTACT = { name: '', phone: '', message: '' };
+const EMPTY_CONTACT = { name: '', phone: '', email: '', message: '' };
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -122,6 +122,7 @@ export default function LandingPage() {
       await api.sendContact({
         name: contact.name.trim(),
         phone: contact.phone.trim(),
+        email: contact.email.trim(),
         message: contact.message.trim(),
       });
       setContact(EMPTY_CONTACT);
@@ -323,7 +324,8 @@ export default function LandingPage() {
             <h2>Sorunuz mu var?</h2>
             <p>
               Fiyatlar, hisse durumu veya kesim günü hakkında bilgi almak için
-              formu doldurun. Talebiniz bize ulaşır, gün içerisinde size döneriz.
+              formu doldurun. Talebiniz bize ulaşır, gün içerisinde telefon
+              veya e-posta ile size döneriz.
             </p>
             <a href={`mailto:${CONTACT_EMAIL}`} className="footer-link contact-direct">
               <AtSign size={15} aria-hidden="true" /> {CONTACT_EMAIL}
@@ -352,6 +354,12 @@ export default function LandingPage() {
                 <input id="ct-phone" className="input" type="tel" required maxLength={30}
                   placeholder="0532 111 22 33" value={contact.phone}
                   onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label htmlFor="ct-email">E-posta</label>
+                <input id="ct-email" className="input" type="email" required maxLength={180}
+                  placeholder="ornek@mail.com" value={contact.email}
+                  onChange={e => setContact(p => ({ ...p, email: e.target.value }))} />
               </div>
               <div className="field">
                 <label htmlFor="ct-msg">Mesajınız</label>
