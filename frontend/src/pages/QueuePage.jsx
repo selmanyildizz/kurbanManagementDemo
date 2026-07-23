@@ -1,3 +1,4 @@
+import { Play, Pause, Slice, Check, User } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { STATUS_LABEL, STATUS_PILL, STATION_STATUS_LABEL, STATION_PILL, timeAgo, maskToken } from '../utils/format';
 
@@ -31,18 +32,22 @@ export default function QueuePage() {
                 <div className="station-actions">
                   {st.currentKurban?.status === 'CALLED' && (
                     <button onClick={() => startCutting(st.currentKurban.id, st.currentKurban.name)}
-                      className="btn btn-danger">🔪 Kes</button>
+                      className="btn btn-danger"><Slice size={15} aria-hidden="true" /> Kes</button>
                   )}
                   {st.currentKurban?.status === 'CUTTING' && (
                     <button onClick={() => complete(st.currentKurban.id, st.currentKurban.name)}
-                      className="btn btn-done">✓ Bitti</button>
+                      className="btn btn-done"><Check size={15} aria-hidden="true" /> Bitti</button>
                   )}
                   {!st.currentKurban && st.status === 'ACTIVE' && (
-                    <button onClick={() => callNext(st.id)} className="btn">▶ Sıradakini Çağır</button>
+                    <button onClick={() => callNext(st.id)} className="btn">
+                      <Play size={15} aria-hidden="true" /> Sıradakini Çağır
+                    </button>
                   )}
                   <button onClick={() => toggleBreak(st.id, st.name)}
                     className={`btn ${st.status === 'BREAK' ? 'btn-done' : 'btn-warn'}`}>
-                    {st.status === 'BREAK' ? '▶ Devam' : '⏸ Mola'}
+                    {st.status === 'BREAK'
+                      ? <><Play size={15} aria-hidden="true" /> Devam</>
+                      : <><Pause size={15} aria-hidden="true" /> Mola</>}
                   </button>
                 </div>
               </div>
@@ -91,7 +96,9 @@ export default function QueuePage() {
               {l.kurbanName && <>{l.kurbanName} </>}
               {l.stationName && <span className="log-station">→ {l.stationName}</span>}
             </div>
-            {l.actor && <div className="log-actor">👤 {l.actor}</div>}
+            {l.actor && (
+              <div className="log-actor"><User size={12} aria-hidden="true" /> {l.actor}</div>
+            )}
             {l.note && <div className="log-note">{l.note}</div>}
           </div>
         ))}

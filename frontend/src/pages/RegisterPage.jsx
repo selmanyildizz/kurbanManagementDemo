@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 const FIELDS = [
@@ -58,7 +59,7 @@ export default function RegisterPage() {
 
         {lastToken && (
           <div className="token-box">
-            <div className="hint">✓ Token kaydedildi</div>
+            <div className="hint"><CheckCircle2 size={14} aria-hidden="true" /> Token kaydedildi</div>
             {tokenRevealed && <div className="code">{lastToken}</div>}
             <div className="hint2">Check-in sırasında bu kod girilecek</div>
             <button type="button" className="btn btn-ghost token-reveal"

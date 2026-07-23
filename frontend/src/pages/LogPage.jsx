@@ -1,3 +1,4 @@
+import { User } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function LogPage() {
@@ -12,7 +13,9 @@ export default function LogPage() {
           <span className="a">{l.action}</span>
           <span className="n">{l.kurbanName || '—'}</span>
           <span className="s">{l.stationName || ''}</span>
-          <span className="who">{l.actor ? `👤 ${l.actor}` : ''}</span>
+          <span className="who">
+            {l.actor && <><User size={12} aria-hidden="true" /> {l.actor}</>}
+          </span>
           {l.note && <span className="note">{l.note}</span>}
         </div>
       ))}

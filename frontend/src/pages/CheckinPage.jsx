@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function CheckinPage() {
@@ -29,7 +30,9 @@ export default function CheckinPage() {
             onChange={e => setCheckinToken(e.target.value.toUpperCase())}
             aria-label="Check-in token"
           />
-          <button type="submit" className="btn btn-done">✓ Giriş</button>
+          <button type="submit" className="btn btn-done">
+            <Check size={15} aria-hidden="true" /> Giriş
+          </button>
         </form>
         <p style={{ fontSize: 12, color: 'var(--noshow)', margin: '14px 0 0' }}>
           Erken gelen = erken sıra. Sıralama tamamen check-in zamanına göre yapılır.

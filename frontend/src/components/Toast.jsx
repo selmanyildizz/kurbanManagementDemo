@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export default function Toast({ msg, type, onClose }) {
   useEffect(() => {
@@ -6,9 +7,11 @@ export default function Toast({ msg, type, onClose }) {
     return () => clearTimeout(t);
   }, [onClose]);
 
+  const Icon = type === 'error' ? XCircle : CheckCircle2;
+
   return (
     <div className={`toast ${type === 'error' ? 'error' : 'ok'}`}>
-      {type === 'error' ? '✕' : '✓'} {msg}
+      <Icon size={16} aria-hidden="true" /> {msg}
     </div>
   );
 }

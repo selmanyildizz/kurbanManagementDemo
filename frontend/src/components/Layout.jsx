@@ -1,4 +1,5 @@
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
+import { ListOrdered, LogOut } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { initials } from '../utils/format';
 import Toast from './Toast';
@@ -24,7 +25,7 @@ export default function Layout() {
 
       <header className="app-header">
         <div className="brand">
-          <span className="emoji" aria-hidden="true">🐑</span>
+          <span className="brand-mark" aria-hidden="true"><ListOrdered size={18} /></span>
           <div>
             <div className="brand-name">Kurban Sıra Sistemi</div>
             <div className="brand-sub">Büro Paneli</div>
@@ -51,7 +52,9 @@ export default function Layout() {
           <div className="user-chip">
             <div className="avatar">{initials(session.displayName)}</div>
             <span>{session.displayName}</span>
-            <button onClick={logout} className="btn btn-ghost" style={{ padding: '7px 13px', fontSize: 12.5 }}>Çıkış</button>
+            <button onClick={logout} className="btn btn-ghost" style={{ padding: '7px 13px', fontSize: 12.5 }}>
+              <LogOut size={14} aria-hidden="true" /> Çıkış
+            </button>
           </div>
         </div>
       </header>

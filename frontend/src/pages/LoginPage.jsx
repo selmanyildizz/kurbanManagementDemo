@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { ListOrdered } from 'lucide-react';
 import { api } from '../api/api';
 import { useApp } from '../context/AppContext';
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
     <div className="login-wrap">
       <div className="login-card">
         <div className="login-brand">
-          <span className="emoji" aria-hidden="true">🐑</span>
+          <span className="brand-mark login-mark" aria-hidden="true"><ListOrdered size={22} /></span>
           <h1>Kurban Sıra Sistemi</h1>
           <div className="sub">Büro Girişi</div>
         </div>

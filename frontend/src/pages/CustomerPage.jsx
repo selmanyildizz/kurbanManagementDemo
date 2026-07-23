@@ -6,14 +6,15 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { Hourglass, BellRing, Slice, CheckCircle2, TimerOff, ClipboardList, ListOrdered } from 'lucide-react';
 import { api } from '../api/api';
 
 const STATUS_ICON = {
-  WAITING: '⏳',
-  CALLED: '🔔',
-  CUTTING: '🔪',
-  DONE: '✅',
-  NOSHOW: '⏰',
+  WAITING: Hourglass,
+  CALLED: BellRing,
+  CUTTING: Slice,
+  DONE: CheckCircle2,
+  NOSHOW: TimerOff,
 };
 
 export default function CustomerPage() {
@@ -38,11 +39,12 @@ export default function CustomerPage() {
   }, [token]);
 
   const statusKey = status?.status || 'none';
+  const StatusIcon = STATUS_ICON[status?.status] ?? ClipboardList;
 
   return (
     <div className="customer-wrap">
       <div className="customer-brand">
-        <span className="emoji" aria-hidden="true">🐑</span>
+        <span className="brand-mark customer-mark" aria-hidden="true"><ListOrdered size={20} /></span>
         <h1>Kurban Takip</h1>
       </div>
 
@@ -51,7 +53,7 @@ export default function CustomerPage() {
       {status && !error && (
         <div className="customer-card">
           <div className={`customer-hero ${statusKey}`}>
-            <div className="icon" aria-hidden="true">{STATUS_ICON[status.status] ?? '📋'}</div>
+            <div className="icon" aria-hidden="true"><StatusIcon size={34} /></div>
             <div className="msg">{status.statusMessage}</div>
           </div>
           <div className="customer-grid">
