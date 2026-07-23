@@ -41,4 +41,18 @@ public class Requests {
         @NotBlank(message = "Ad Soyad zorunlu")
         public String displayName;
     }
+
+    // Landing sayfasındaki "Bilgi Al" formu. Kimlik doğrulaması olmayan bir
+    // uçtan geldiği için alan uzunlukları sınırlı tutuluyor.
+    public static class ContactRequest {
+        @NotBlank(message = "Ad Soyad zorunlu")
+        @Size(max = 120, message = "Ad Soyad çok uzun")
+        public String name;
+        @NotBlank(message = "Telefon zorunlu")
+        @Size(max = 30, message = "Telefon çok uzun")
+        public String phone;
+        @NotBlank(message = "Mesaj zorunlu")
+        @Size(max = 2000, message = "Mesaj en fazla 2000 karakter olabilir")
+        public String message;
+    }
 }

@@ -28,6 +28,10 @@ public class EmailService {
     @Value("${email.brevo.api-key:}")
     private String apiKey;
 
+    /** Bilgi taleplerinin düşeceği kutu; boşsa {@code email.from} kullanılır. */
+    @Value("${email.contact-to:}")
+    private String contactTo;
+
     @PostConstruct
     void checkConfig() {
         if (enabled && (from.isBlank() || apiKey.isBlank())) {
@@ -35,12 +39,21 @@ public class EmailService {
         }
     }
 
+    /** Ateşle-unut gönderim: müşteri bildirimleri isteği bloklamamalı. */
     @Async
     public void send(String to, String subject, String body) {
-        if (to == null || to.isBlank()) return;
+        doSend(to, subject, body);
+    }
+
+    /**
+     * Senkron gönderim; çağıran tarafın başarıyı bilmesi gerektiğinde
+     * (ör. iletişim formu, kullanıcıya sonuç gösterilecek) kullanılır.
+     */
+    public boolean doSend(String to, String subject, String body) {
+        if (to == null || to.isBlank()) return false;
         if (!enabled) {
             log.info("✉️ Email [SIM] → {} : {} — {}", to, subject, body);
-            return;
+            return true;
         }
         try {
             // Brevo'nun HTTPS API'si kullanılıyor (SMTP değil) — bazı PaaS
@@ -61,16 +74,35 @@ public class EmailService {
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
                 log.info("E-posta gönderildi: {}", to);
-            } else {
-                log.error("E-posta gönderilemedi. Brevo durum kodu: {}", resp.statusCode());
+                return true;
             }
+            log.error("E-posta gönderilemedi. Brevo durum kodu: {}", resp.statusCode());
+            return false;
         } catch (Exception e) {
             log.error("E-posta gönderilemedi: {}", e.getMessage());
+            return false;
         }
     }
 
     private String jsonEscape(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (char c : s.toCharArray()) {
+            switch (c) {
+                case '\\' -> sb.append("\\\\");
+                case '"'  -> sb.append("\\\"");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                default -> {
+                    // Kalan kontrol karakterleri JSON'da düz geçemez.
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+                }
+            }
+        }
+        return sb.toString();
     }
 
     public void sendRegistration(String email, String name, String token) {
@@ -96,5 +128,28 @@ public class EmailService {
 
     public void sendBreakNotice(String email, String name) {
         send(email, "Mola Bildirimi", String.format("Sayın %s, kasabımız kısa mola veriyor. Sıranız korunuyor.", name));
+    }
+
+    /**
+     * Landing sayfasındaki bilgi talebini işletmeye iletir. Gönderen adres
+     * doğrulanmış {@code email.from} olmak zorunda (Brevo şartı); ziyaretçinin
+     * iletişim bilgisi mesaj gövdesinde taşınır.
+     */
+    public boolean sendContactRequest(String name, String phone, String message) {
+        String to = contactTo.isBlank() ? from : contactTo;
+        if (to.isBlank()) {
+            log.error("Bilgi talebi iletilemiyor: EMAIL_CONTACT_TO (veya EMAIL_FROM) ayarlanmamış.");
+            return false;
+        }
+        String body = String.format("""
+                Web sitesinden yeni bilgi talebi:
+
+                Ad Soyad : %s
+                Telefon  : %s
+
+                Mesaj:
+                %s
+                """, name, phone, message);
+        return doSend(to, "Bilgi Talebi — " + name, body);
     }
 }

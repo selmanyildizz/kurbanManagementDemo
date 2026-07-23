@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { api } from '../api/api';
 import {
   ListOrdered, ShieldCheck, Radio, MailCheck, LayoutGrid, ScrollText,
   MonitorSmartphone, ClipboardList, CheckCircle2, Smartphone, BellRing,
@@ -103,6 +104,9 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [token, setToken] = useState('');
   const [contact, setContact] = useState(EMPTY_CONTACT);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [contactError, setContactError] = useState(null);
 
   function handleTrack(e) {
     e.preventDefault();
@@ -110,21 +114,34 @@ export default function LandingPage() {
     if (t) navigate(`/durum/${t}`);
   }
 
-  // Sunucu tarafı form işleme yok; talep kullanıcının kendi e-posta
-  // istemcisinde hazır bir taslak olarak açılır.
-  function mailtoLink(subject, body) {
-    return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  async function handleContact(e) {
+    e.preventDefault();
+    setContactError(null);
+    setSending(true);
+    try {
+      await api.sendContact({
+        name: contact.name.trim(),
+        phone: contact.phone.trim(),
+        message: contact.message.trim(),
+      });
+      setContact(EMPTY_CONTACT);
+      setSent(true);
+    } catch (err) {
+      setContactError(err.message);
+    } finally {
+      setSending(false);
+    }
   }
 
-  function handleContact(e) {
-    e.preventDefault();
-    const body = [
-      `Ad Soyad: ${contact.name}`,
-      `Telefon: ${contact.phone}`,
-      '',
-      contact.message,
-    ].join('\n');
-    window.location.href = mailtoLink('Bilgi Talebi — Kurban Sıra Sistemi', body);
+  // Fiyat kartındaki "Bilgi Al" formu doldurulmuş olarak açar.
+  function askAbout(planName) {
+    setSent(false);
+    setContactError(null);
+    setContact(p => ({
+      ...p,
+      message: `"${planName}" hizmeti hakkında bilgi almak istiyorum.`,
+    }));
+    document.getElementById('iletisim')?.scrollIntoView({ behavior: 'smooth' });
   }
 
   return (
@@ -259,15 +276,10 @@ export default function LandingPage() {
                   <li key={item}><Check size={15} aria-hidden="true" /> {item}</li>
                 ))}
               </ul>
-              <a
-                href={mailtoLink(
-                  `Fiyat Bilgisi — ${plan.name}`,
-                  `Merhaba,\n\n"${plan.name}" hizmeti hakkında bilgi almak istiyorum.\n\nAd Soyad:\nTelefon:\nHisse/adet:\n`,
-                )}
-                className={`btn btn-block${plan.featured ? '' : ' btn-ghost'}`}
-              >
+              <button type="button" onClick={() => askAbout(plan.name)}
+                className={`btn btn-block${plan.featured ? '' : ' btn-ghost'}`}>
                 Bilgi Al <ArrowRight size={15} aria-hidden="true" />
-              </a>
+              </button>
             </div>
           ))}
         </div>
@@ -311,37 +323,49 @@ export default function LandingPage() {
             <h2>Sorunuz mu var?</h2>
             <p>
               Fiyatlar, hisse durumu veya kesim günü hakkında bilgi almak için
-              formu doldurun. Formu gönderdiğinizde e-posta uygulamanızda hazır
-              bir mesaj açılır.
+              formu doldurun. Talebiniz bize ulaşır, gün içerisinde size döneriz.
             </p>
             <a href={`mailto:${CONTACT_EMAIL}`} className="footer-link contact-direct">
               <AtSign size={15} aria-hidden="true" /> {CONTACT_EMAIL}
             </a>
           </div>
 
-          <form onSubmit={handleContact} className="form contact-form">
-            <div className="field">
-              <label htmlFor="ct-name">Ad Soyad</label>
-              <input id="ct-name" className="input" required value={contact.name}
-                onChange={e => setContact(p => ({ ...p, name: e.target.value }))} />
+          {sent ? (
+            <div className="contact-success">
+              <div className="contact-success-icon" aria-hidden="true"><CheckCircle2 size={28} /></div>
+              <b>Talebiniz alındı</b>
+              <p>Gün içerisinde size döneceğiz. Teşekkür ederiz.</p>
+              <button type="button" className="btn btn-ghost" onClick={() => setSent(false)}>
+                Yeni talep gönder
+              </button>
             </div>
-            <div className="field">
-              <label htmlFor="ct-phone">Telefon</label>
-              <input id="ct-phone" className="input" type="tel" placeholder="0532 111 22 33"
-                value={contact.phone}
-                onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label htmlFor="ct-msg">Mesajınız</label>
-              <textarea id="ct-msg" className="input" rows={4} required
-                placeholder="Hangi hizmet hakkında bilgi almak istiyorsunuz?"
-                value={contact.message}
-                onChange={e => setContact(p => ({ ...p, message: e.target.value }))} />
-            </div>
-            <button type="submit" className="btn btn-block">
-              <Send size={15} aria-hidden="true" /> Gönder
-            </button>
-          </form>
+          ) : (
+            <form onSubmit={handleContact} className="form contact-form">
+              <div className="field">
+                <label htmlFor="ct-name">Ad Soyad</label>
+                <input id="ct-name" className="input" required maxLength={120}
+                  value={contact.name}
+                  onChange={e => setContact(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label htmlFor="ct-phone">Telefon</label>
+                <input id="ct-phone" className="input" type="tel" required maxLength={30}
+                  placeholder="0532 111 22 33" value={contact.phone}
+                  onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label htmlFor="ct-msg">Mesajınız</label>
+                <textarea id="ct-msg" className="input" rows={4} required maxLength={2000}
+                  placeholder="Hangi hizmet hakkında bilgi almak istiyorsunuz?"
+                  value={contact.message}
+                  onChange={e => setContact(p => ({ ...p, message: e.target.value }))} />
+              </div>
+              {contactError && <div className="login-error">{contactError}</div>}
+              <button type="submit" disabled={sending} className="btn btn-block">
+                <Send size={15} aria-hidden="true" /> {sending ? 'Gönderiliyor...' : 'Gönder'}
+              </button>
+            </form>
+          )}
         </div>
       </section>
 

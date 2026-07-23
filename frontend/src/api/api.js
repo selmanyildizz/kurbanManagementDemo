@@ -68,4 +68,7 @@ export const api = {
 
   // Müşteri (public)
   getStatus: (token) => req('GET', `/status/${token}`, null, { auth: false }),
+
+  // Landing "Bilgi Al" formu (public)
+  sendContact: (body) => req('POST', '/contact', body, { auth: false }),
 };

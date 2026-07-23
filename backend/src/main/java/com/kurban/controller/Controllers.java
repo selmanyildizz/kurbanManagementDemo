@@ -6,15 +6,22 @@ import com.kurban.entity.ButcherStation;
 import com.kurban.entity.StaffUser;
 import com.kurban.repository.ButcherStationRepository;
 import com.kurban.repository.StaffUserRepository;
+import com.kurban.service.EmailService;
 import com.kurban.service.QueueService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -123,6 +130,62 @@ class PublicController {
     @GetMapping("/{token}")
     public ResponseEntity<Responses.CustomerStatusResponse> status(@PathVariable String token) {
         return ResponseEntity.ok(queueService.getCustomerStatus(token));
+    }
+}
+
+@RestController
+@RequestMapping("/api/contact")
+class ContactController {
+
+    private static final Logger log = LoggerFactory.getLogger(ContactController.class);
+
+    /** Aynı IP'den art arda form gönderimine izin verilen en kısa süre. */
+    private static final long MIN_INTERVAL_MS = 30_000;
+    private static final int MAX_TRACKED_IPS = 10_000;
+
+    private final EmailService emailService;
+    private final Map<String, Long> lastSubmission = new ConcurrentHashMap<>();
+
+    ContactController(EmailService emailService) {
+        this.emailService = emailService;
+    }
+
+    @PostMapping
+    public ResponseEntity<?> submit(@Valid @RequestBody Requests.ContactRequest req,
+                                    HttpServletRequest http) {
+        String ip = clientIp(http);
+        long now = System.currentTimeMillis();
+
+        Long previous = lastSubmission.get(ip);
+        if (previous != null && now - previous < MIN_INTERVAL_MS) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("message", "Az önce bir talep gönderdiniz. Lütfen biraz bekleyin."));
+        }
+
+        boolean sent = emailService.sendContactRequest(
+                req.name.trim(), req.phone.trim(), req.message.trim());
+        if (!sent) {
+            log.error("İletişim formu gönderilemedi (IP {})", ip);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", "Mesaj şu anda gönderilemedi. Lütfen daha sonra tekrar deneyin."));
+        }
+
+        // Sınırsız büyümesin: eşik aşılırsa eski kayıtlar temizlenir.
+        if (lastSubmission.size() > MAX_TRACKED_IPS) {
+            lastSubmission.entrySet().removeIf(e -> now - e.getValue() > MIN_INTERVAL_MS);
+        }
+        lastSubmission.put(ip, now);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Talebiniz alındı. Gün içerisinde size döneceğiz."));
+    }
+
+    private String clientIp(HttpServletRequest http) {
+        String forwarded = http.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return http.getRemoteAddr();
     }
 }
 
