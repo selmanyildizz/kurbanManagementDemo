@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ListOrdered } from 'lucide-react';
+import { ListOrdered, Eye, EyeOff } from 'lucide-react';
 import { api } from '../api/api';
 import { useApp } from '../context/AppContext';
 
@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,8 +46,17 @@ export default function LoginPage() {
           </div>
           <div className="field">
             <label htmlFor="login-pass">Şifre</label>
-            <input id="login-pass" className="input" type="password" value={password}
-              onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
+            <div className="input-suffix">
+              <input id="login-pass" className="input" type={showPassword ? 'text' : 'password'}
+                value={password} onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password" />
+              <button type="button" className="input-suffix-btn"
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
+                title={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}>
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
           </div>
           {error && <div className="login-error">{error}</div>}
           <button type="submit" disabled={loading} className="btn btn-block">

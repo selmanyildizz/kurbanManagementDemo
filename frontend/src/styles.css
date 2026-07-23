@@ -40,7 +40,7 @@ body {
 }
 
 button { font-family: inherit; }
-input, select { font-family: inherit; }
+input, select, textarea { font-family: inherit; }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
@@ -52,7 +52,7 @@ input, select { font-family: inherit; }
   background: var(--accent); color: var(--accent-ink);
   transition: filter .15s;
 }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; }
 .btn:hover { filter: brightness(1.06); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn:disabled { opacity: .6; cursor: default; }
@@ -366,6 +366,18 @@ input, select { font-family: inherit; }
 }
 .input-icon .input { padding-left: 38px; }
 
+/* Sağında butonu olan alan (şifre göster/gizle) */
+.input-suffix { position: relative; display: flex; align-items: center; }
+.input-suffix .input { padding-right: 44px; }
+.input-suffix-btn {
+  position: absolute; right: 6px;
+  background: none; border: none; cursor: pointer; color: var(--noshow);
+  padding: 7px; border-radius: 8px; display: flex; align-items: center;
+  transition: color .15s;
+}
+.input-suffix-btn:hover { color: var(--dim); }
+.input-suffix-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 /* Hero: iki sütun */
 .hero {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -472,6 +484,62 @@ input, select { font-family: inherit; }
 .feature-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
 .feature-text { font-size: 13px; color: var(--dim); line-height: 1.55; }
 
+/* Fiyat listesi */
+.pricing-section { max-width: 1080px; margin: 0 auto; padding: 20px 48px 90px; }
+.pricing-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start;
+}
+.plan-card {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px 24px;
+}
+.plan-card.featured {
+  border-color: var(--accent); box-shadow: 0 18px 44px -22px rgba(34, 48, 41, .45);
+  padding-top: 34px;
+}
+.plan-badge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  padding: 5px 14px; border-radius: 999px;
+}
+.plan-name { font-weight: 700; font-size: 15px; color: var(--dim); }
+.plan-price { display: flex; align-items: baseline; gap: 6px; margin: 8px 0 4px; }
+.plan-price .amount {
+  font-family: var(--font-display); font-size: 34px; font-weight: 600; color: var(--ink);
+}
+.plan-price .unit { font-size: 13px; color: var(--noshow); }
+.plan-desc { font-size: 13px; color: var(--dim); line-height: 1.5; margin-bottom: 18px; }
+.plan-items {
+  list-style: none; margin: 0 0 24px; padding: 0;
+  display: flex; flex-direction: column; gap: 9px; flex: 1;
+}
+.plan-items li {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--dim);
+}
+.plan-items svg { color: var(--accent); flex-shrink: 0; }
+.pricing-note {
+  text-align: center; font-size: 12.5px; color: var(--noshow);
+  margin: 28px auto 0; max-width: 520px; line-height: 1.6;
+}
+
+/* Bilgi alma / iletişim */
+.contact-section { max-width: 1080px; margin: 0 auto; padding: 0 48px 90px; }
+.contact-card {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 44px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 44px;
+}
+.contact-left h2 {
+  font-family: var(--font-display); font-weight: 600; font-size: 28px;
+  margin: 0 0 12px; text-wrap: balance;
+}
+.contact-left p { font-size: 14px; color: var(--dim); line-height: 1.65; margin: 0 0 20px; }
+.contact-direct { font-size: 14px; font-weight: 600; color: var(--accent); }
+.contact-form textarea.input { resize: vertical; min-height: 96px; }
+
 /* CTA banner (fotoğraf üzerine koyu katman) */
 .cta-banner {
   position: relative; color: #fff; text-align: center;
@@ -556,6 +624,9 @@ input, select { font-family: inherit; }
   .footer-inner { grid-template-columns: 1fr 1fr; padding: 48px 32px 32px; }
   .footer-brand { grid-column: 1 / -1; }
   .footer-bottom { padding: 20px 32px; }
+  .pricing-section { padding: 20px 32px 70px; }
+  .contact-section { padding: 0 32px 70px; }
+  .contact-card { grid-template-columns: 1fr; gap: 28px; padding: 36px 32px; }
 }
 
 @media (max-width: 720px) {
@@ -587,6 +658,12 @@ input, select { font-family: inherit; }
   .mockup-status { left: -10px; top: 24px; width: 190px; }
   .footer-inner { grid-template-columns: 1fr; gap: 32px; padding: 40px 20px 28px; }
   .footer-bottom { padding: 18px 20px; }
+  .pricing-section { padding: 20px 20px 56px; }
+  .pricing-grid { grid-template-columns: 1fr; gap: 26px; }
+  .plan-card.featured { padding-top: 34px; }
+  .contact-section { padding: 0 20px 56px; }
+  .contact-card { padding: 28px 22px; }
+  .contact-left h2 { font-size: 23px; }
 }
 
 @media (max-width: 400px) {

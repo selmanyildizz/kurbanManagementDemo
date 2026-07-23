@@ -3,11 +3,42 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   ListOrdered, ShieldCheck, Radio, MailCheck, LayoutGrid, ScrollText,
   MonitorSmartphone, ClipboardList, CheckCircle2, Smartphone, BellRing,
-  ArrowRight, Search, AtSign,
+  ArrowRight, Search, AtSign, Check, Send,
 } from 'lucide-react';
 
 const HERO_IMG = 'https://images.unsplash.com/photo-1484557985045-edf25e08da73?auto=format&fit=crop&w=1100&q=80';
 const CTA_IMG = 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=1600&q=80';
+
+// Bilgi/fiyat taleplerinin düşeceği adres.
+const CONTACT_EMAIL = 'selmanyildiz555@gmail.com';
+
+// TODO: Fiyatlar örnek değerlerdir — işletmenin güncel fiyat listesiyle değiştirin.
+const PLANS = [
+  {
+    name: 'Küçükbaş',
+    price: '8.500',
+    unit: '/ adet',
+    desc: 'Koyun veya keçi, tam kurban.',
+    items: ['Kesim ve yüzme', 'Parçalama', 'Sıra takip kodu', 'E-posta bildirimi'],
+    featured: false,
+  },
+  {
+    name: 'Büyükbaş Hisse',
+    price: '3.900',
+    unit: '/ hisse',
+    desc: 'Yedi hisseli büyükbaşta tek hisse.',
+    items: ['Kesim ve yüzme', 'Hisse ayrımı ve tartım', 'Parçalama', 'Sıra takip kodu', 'E-posta bildirimi'],
+    featured: true,
+  },
+  {
+    name: 'Büyükbaş Tam',
+    price: '26.000',
+    unit: '/ adet',
+    desc: 'Tüm hisseler tek kişiye ait.',
+    items: ['Kesim ve yüzme', 'Parçalama', 'Öncelikli sıra', 'Sıra takip kodu', 'E-posta bildirimi'],
+    featured: false,
+  },
+];
 
 const CHIPS = [
   { Icon: ShieldCheck, text: 'Güvenli token sistemi' },
@@ -66,14 +97,34 @@ const STEPS = [
   },
 ];
 
+const EMPTY_CONTACT = { name: '', phone: '', message: '' };
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [token, setToken] = useState('');
+  const [contact, setContact] = useState(EMPTY_CONTACT);
 
   function handleTrack(e) {
     e.preventDefault();
     const t = token.trim().toUpperCase();
     if (t) navigate(`/durum/${t}`);
+  }
+
+  // Sunucu tarafı form işleme yok; talep kullanıcının kendi e-posta
+  // istemcisinde hazır bir taslak olarak açılır.
+  function mailtoLink(subject, body) {
+    return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function handleContact(e) {
+    e.preventDefault();
+    const body = [
+      `Ad Soyad: ${contact.name}`,
+      `Telefon: ${contact.phone}`,
+      '',
+      contact.message,
+    ].join('\n');
+    window.location.href = mailtoLink('Bilgi Talebi — Kurban Sıra Sistemi', body);
   }
 
   return (
@@ -85,6 +136,7 @@ export default function LandingPage() {
         </div>
         <nav className="landing-nav-links">
           <a href="#ozellikler">Özellikler</a>
+          <a href="#fiyatlar">Fiyatlar</a>
           <a href="#nasil-calisir">Nasıl Çalışır</a>
           <a href="#iletisim">İletişim</a>
         </nav>
@@ -187,6 +239,44 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="pricing-section" id="fiyatlar">
+        <div className="section-head">
+          <span className="eyebrow">Fiyatlar</span>
+          <h2>Hizmet ve fiyat listesi</h2>
+        </div>
+        <div className="pricing-grid">
+          {PLANS.map(plan => (
+            <div key={plan.name} className={`plan-card${plan.featured ? ' featured' : ''}`}>
+              {plan.featured && <div className="plan-badge">En çok tercih edilen</div>}
+              <div className="plan-name">{plan.name}</div>
+              <div className="plan-price">
+                <span className="amount tabular">₺{plan.price}</span>
+                <span className="unit">{plan.unit}</span>
+              </div>
+              <div className="plan-desc">{plan.desc}</div>
+              <ul className="plan-items">
+                {plan.items.map(item => (
+                  <li key={item}><Check size={15} aria-hidden="true" /> {item}</li>
+                ))}
+              </ul>
+              <a
+                href={mailtoLink(
+                  `Fiyat Bilgisi — ${plan.name}`,
+                  `Merhaba,\n\n"${plan.name}" hizmeti hakkında bilgi almak istiyorum.\n\nAd Soyad:\nTelefon:\nHisse/adet:\n`,
+                )}
+                className={`btn btn-block${plan.featured ? '' : ' btn-ghost'}`}
+              >
+                Bilgi Al <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+          ))}
+        </div>
+        <p className="pricing-note">
+          Fiyatlara kesim, yüzme ve parçalama dahildir. Güncel fiyatlar ve
+          toplu kayıtlar için bizimle iletişime geçin.
+        </p>
+      </section>
+
       <section className="cta-banner" style={{ backgroundImage: `url(${CTA_IMG})` }}>
         <div className="cta-inner">
           <h2>Kurban kesim sürecinizi bugün dijitalleştirin</h2>
@@ -214,7 +304,48 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="landing-footer" id="iletisim">
+      <section className="contact-section" id="iletisim">
+        <div className="contact-card">
+          <div className="contact-left">
+            <span className="eyebrow">Bilgi Al</span>
+            <h2>Sorunuz mu var?</h2>
+            <p>
+              Fiyatlar, hisse durumu veya kesim günü hakkında bilgi almak için
+              formu doldurun. Formu gönderdiğinizde e-posta uygulamanızda hazır
+              bir mesaj açılır.
+            </p>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="footer-link contact-direct">
+              <AtSign size={15} aria-hidden="true" /> {CONTACT_EMAIL}
+            </a>
+          </div>
+
+          <form onSubmit={handleContact} className="form contact-form">
+            <div className="field">
+              <label htmlFor="ct-name">Ad Soyad</label>
+              <input id="ct-name" className="input" required value={contact.name}
+                onChange={e => setContact(p => ({ ...p, name: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label htmlFor="ct-phone">Telefon</label>
+              <input id="ct-phone" className="input" type="tel" placeholder="0532 111 22 33"
+                value={contact.phone}
+                onChange={e => setContact(p => ({ ...p, phone: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label htmlFor="ct-msg">Mesajınız</label>
+              <textarea id="ct-msg" className="input" rows={4} required
+                placeholder="Hangi hizmet hakkında bilgi almak istiyorsunuz?"
+                value={contact.message}
+                onChange={e => setContact(p => ({ ...p, message: e.target.value }))} />
+            </div>
+            <button type="submit" className="btn btn-block">
+              <Send size={15} aria-hidden="true" /> Gönder
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="brand">
@@ -229,15 +360,17 @@ export default function LandingPage() {
 
           <div className="footer-col">
             <h3>Bizimle İletişim</h3>
-            <a href="mailto:selmanyildiz555@gmail.com" className="footer-link">
-              <AtSign size={15} aria-hidden="true" /> selmanyildiz555@gmail.com
+            <a href={`mailto:${CONTACT_EMAIL}`} className="footer-link">
+              <AtSign size={15} aria-hidden="true" /> {CONTACT_EMAIL}
             </a>
           </div>
 
           <div className="footer-col">
             <h3>Bağlantılar</h3>
             <a href="#ozellikler" className="footer-link">Özellikler</a>
+            <a href="#fiyatlar" className="footer-link">Fiyatlar</a>
             <a href="#nasil-calisir" className="footer-link">Nasıl Çalışır</a>
+            <a href="#iletisim" className="footer-link">Bilgi Al</a>
             <Link to="/giris" className="footer-link">Personel Girişi</Link>
           </div>
         </div>
